@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  mysqldb:
+    image: mysql:8.0
+    container_name: mysql-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql_password
+      MYSQL_DATABASE: mysql_database
+    ports:
+      # Expose the MySQL port
+      - "3307:3306"
+    volumes:
+      # mount the init into the containers init folder
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Persist the database data 
+      - db-data:/var/lib/mysql
+
+volumes:
+  db-data:
