@@ -2,11 +2,23 @@
   "name": "girigiri",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "db:reset": "docker-compose down -v && docker-compose up -d",
-    "db:seed": "node ./scripts/seed.js"
+    "start": "node src/server.js",
+    "//-- SEEDING --//": "",
+    "db:seed:local": "dotenv -e .local.env -- node ./scripts/seed.js",
+    "db:seed:container": "docker-compose exec app npm run db:seed:internal",
+    "db:seed:internal": "node ./scripts/seed.js",
+
+    "//-- MANAGEMENT --//": "",
+    "db:reset": "docker-compose down -v && docker-compose up -d --build"
+  },
+  "scriptsComments": {
+    "start": "starts the server locally",
+    "db:reset": "resets the container (rebuilds)",
+    "db:seed": "seeds the container database from the local machine",
+    "db:seed-container": "seed from container"
   },
   "repository": {
     "type": "git",
@@ -19,7 +31,11 @@
   },
   "homepage": "https://github.com/inovait/girigiri#readme",
   "dependencies": {
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "mysql2": "^3.14.3"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^10.0.0"
   }
 }

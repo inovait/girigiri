@@ -2,7 +2,7 @@
 FROM node:18
 
 # Create app directory
-WORKDIR /usr/src/app
+WORKDIR /src/app
 
 # Install dependencies
 COPY package*.json ./
@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 3000
 
 # Run migrations on container start, then start app
-CMD ["sh", "-c", "node index.js && npm start"]
+CMD ["npm", "start"]
