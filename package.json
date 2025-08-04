@@ -12,13 +12,7 @@
     "db:seed:internal": "node ./scripts/seed.js",
 
     "//-- MANAGEMENT --//": "",
-    "db:reset": "docker-compose down -v && docker-compose up -d --build"
-  },
-  "scriptsComments": {
-    "start": "starts the server locally",
-    "db:reset": "resets the container (rebuilds)",
-    "db:seed": "seeds the container database from the local machine",
-    "db:seed-container": "seed from container"
+    "docker:reset": "docker-compose down -v && docker-compose up -d --build"
   },
   "repository": {
     "type": "git",
