@@ -1,0 +1,25 @@
+{
+  "name": "girigiri",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:reset": "docker-compose down -v && docker-compose up -d",
+    "db:seed": "node ./scripts/seed.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inovait/girigiri.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/inovait/girigiri/issues"
+  },
+  "homepage": "https://github.com/inovait/girigiri#readme",
+  "dependencies": {
+    "express": "^5.1.0",
+    "mysql2": "^3.14.3"
+  }
+}
