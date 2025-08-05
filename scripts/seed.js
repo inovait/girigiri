@@ -22,7 +22,7 @@ const runSeed = async () => {
       process.exit(1);
     }
 
-    console.log(`🌱 Connecting to database at ${host}:${port}...`);
+    console.log(`Connecting to database at ${host}:${port}...`);
 
     // create a connection to the database
      const connection = await mysql.createConnection({

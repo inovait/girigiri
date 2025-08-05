@@ -1,19 +1,45 @@
-# Use Node base image
-FROM node:18
 
-# Create app directory
-WORKDIR /src/app
 
-# Install dependencies
+#  first stage -> install all dependencies and compile typescript
+FROM node:18-alpine AS builder
+
+# set the working directory. Create it if it doesnt exist
+WORKDIR /usr/src/app
+
+# copy the package files  this will be re run if package.json or package.lock json have changed
 COPY package*.json ./
+# install all dependencies
 RUN npm install
-# Copy source
+
+# copy the source code
 COPY . .
 
-RUN npm run tsc
+# run the build - creates the dist folder
+RUN npm run build
 
-# Expose the port to access via localhost
+
+
+# second stage - create the lean image
+FROM node:18-alpine
+
+ARG NODE_ENV=development
+ENV NODE_ENV=${NODE_ENV}
+
+# change from default root to node (less privileged user)
+USER node
+
+# set the working directory to a folder inside the node users home directory
+WORKDIR /home/node/app
+
+# copy the dependencies from the builder stage and make the node user own the files
+COPY --chown=node:node --from=builder /usr/src/app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /usr/src/app/package*.json ./
+
+# copy the compiled 'dist' folder from the builder stage.
+COPY --chown=node:node --from=builder /usr/src/app/dist ./dist
+
+# expose the port.
 EXPOSE 3000
 
-# Run migrations on container start, then start app
-CMD ["node", "dist/server.js"]
+# run the final compiled image
+CMD [ "node", "dist/server.js" ]
