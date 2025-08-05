@@ -3,15 +3,19 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/server.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/server.js",
+    "start:local": "dotenv -e .local.env -- node dist/server.js",
+    "start": "node dist/server.js",
+    "build": "tsc",
     "//-- SEEDING --//": "",
     "db:seed:local": "dotenv -e .local.env -- node ./scripts/seed.js",
     "db:seed:container": "docker-compose exec app npm run db:seed:internal",
     "db:seed:internal": "node ./scripts/seed.js",
     "//-- MANAGEMENT --//": "",
-    "docker:reset": "docker-compose down -v && docker-compose up -d --build"
+    "docker:reset": "docker-compose down -v && docker-compose up -d --build",
+    "tsc": "tsc"
   },
   "repository": {
     "type": "git",
@@ -30,6 +34,10 @@
     "typeorm": "^0.3.25"
   },
   "devDependencies": {
-    "dotenv-cli": "^10.0.0"
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.2.0",
+    "dotenv-cli": "^10.0.0",
+    "reflect-metadata": "^0.2.2",
+    "typescript": "^5.9.2"
   }
 }
