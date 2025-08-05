@@ -38,6 +38,10 @@ COPY --chown=node:node --from=builder /usr/src/app/package*.json ./
 # copy the compiled 'dist' folder from the builder stage.
 COPY --chown=node:node --from=builder /usr/src/app/dist ./dist
 
+# copy the scripts and the sql directory
+COPY --chown=node:node --from=builder /usr/src/app/scripts ./scripts
+COPY --chown=node:node --from=builder /usr/src/app/database ./database
+
 # expose the port.
 EXPOSE 3000
 
