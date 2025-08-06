@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"Error: no test specified\" && exit 1", 
     "start:local": "dotenv -e .local.env -- node dist/server.js",
     "start": "node dist/server.js",
     "build": "tsc",
@@ -13,8 +13,16 @@
     "db:seed:local": "dotenv -e .local.env -- node ./scripts/seed.js",
     "db:seed:container": "docker-compose exec app npm run db:seed:internal",
     "db:seed:internal": "node ./scripts/seed.js",
+    "//-- TYPEORM --//": "",
+    "migration:generate:local": "NODE_OPTIONS='--loader ts-node/esm' dotenv -e .local.env -- typeorm migration:generate src/database/migrations/InitMigration --dataSource src/database/data-source.ts",
+    "migration:generate:container": "NODE_OPTIONS='--loader ts-node/esm' typeorm migration:generate dist/database/migrations/InitMigration --dataSource dist/database/data-source.js",
+    "migration:run:local": "NODE_OPTIONS='--loader ts-node/esm' npx dotenv -e .local.env -- typeorm migration:run --dataSource src/database/data-source.ts",
+    "migration:run:container": "NODE_OPTIONS='--loader ts-node/esm' npx typeorm migration:run --dataSource dist/database/data-source.js",
+    "migration:revert:container": "NODE_OPTIONS='--loader ts-node/esm' dotenv -e .local.env -- typeorm migration:revert --dataSource src/database/data-source.ts",
+
     "//-- MANAGEMENT --//": "",
     "docker:reset": "docker-compose down -v && docker-compose up -d --build",
+    "docker:enter": "docker exec -it node-app /bin/sh",
     "tsc": "tsc"
   },
   "repository": {
@@ -38,6 +46,7 @@
     "@types/node": "^24.2.0",
     "dotenv-cli": "^10.0.0",
     "reflect-metadata": "^0.2.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }
 }
