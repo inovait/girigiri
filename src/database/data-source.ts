@@ -15,8 +15,9 @@ export const MySqlDataSource = new DataSource({
     username: process.env.DB_USER!,
     password: process.env.DB_PASSWORD!,
     database: process.env.DB_NAME!,
-    synchronize: true, // configure to true only if on dev
+    synchronize: false, // configure to true only if on dev
     logging: true,
     entities: [path.join(__dirname, 'entity', '**', '*.{js,ts}')],
+    migrations: [path.join(__dirname, 'migrations', '**', '*.{js,ts}')]
 });
 
