@@ -10,7 +10,6 @@
     "db:seed:local": "dotenv -e .local.env -- node ./scripts/seed.js",
     "db:seed:container": "docker-compose exec app npm run db:seed:internal",
     "db:seed:internal": "node ./scripts/seed.js",
-
     "//-- MANAGEMENT --//": "",
     "docker:reset": "docker-compose down -v && docker-compose up -d --build"
   },
@@ -30,6 +29,8 @@
     "mysql2": "^3.14.3"
   },
   "devDependencies": {
-    "dotenv-cli": "^10.0.0"
+    "@types/node": "^24.2.0",
+    "dotenv-cli": "^10.0.0",
+    "typescript": "^5.9.2"
   }
 }
