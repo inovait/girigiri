@@ -4,9 +4,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as mysql from 'mysql2/promise'
 import type { Connection, RowDataPacket } from 'mysql2/promise'
-import { error } from 'console';
+import { pino } from 'pino'
 
 dotenv.config()
+const logger = pino({
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true
+    }
+  }
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,17 +46,26 @@ async function connect(): Promise<Connection> {
 
 // check if mig table exists
 async function validateMigrationsTable(conn: Connection): Promise<void> {
-    const createTable = fs.readFileSync(path.join(__dirname, '..', 'migrations', '001_init.sql')) // pull the sql from the migrations subfolder and execute
+    logger.info('Validating migrations table')
+    const initSqlPath = path.join(__dirname, '..', 'migrations', '001_init.sql');
+    
+    if (!fs.existsSync(initSqlPath)) { // check if exists
+      throw new Error(`Missing migration init file at: ${initSqlPath}`);
+    }
+
+    const createTable = fs.readFileSync(initSqlPath, 'utf8') // pull the sql from the migrations subfolder and execute
     await conn.execute(createTable.toString());
 }
 
 
 // get applied migs
 async function getAppliedMigrations(conn: Connection): Promise<string[]> {
+    logger.info('Retrieving applied migrations from database')
     const [rows] = await conn.execute<MigrationRow[]>("Select name FROM migrations");
     return rows.map(row => row.name);
 }
 
+// apply single migration
 async function applyMigration(conn: Connection, filePath: string, fileName: string): Promise<void> {
     const sql = fs.readFileSync(filePath, 'utf8')
     try {
@@ -56,11 +73,11 @@ async function applyMigration(conn: Connection, filePath: string, fileName: stri
         await conn.query(sql)
         await conn.query('INSERT INTO migrations (name) values (?)', [fileName])
         await conn.commit();
-        console.log(`Applied migration: ${fileName}`)
+        logger.info(`Applied migration: ${fileName}`)
     } catch (err: any) {
+        logger.error(`Failed migration: ${fileName}. Rolling back changes`)
         await conn.rollback();
-        console.error(`Failed migration: ${fileName}`)
-        console.error(err.stack)
+        logger.error(err.stack || err.message )
         throw err
     }
 }
@@ -68,8 +85,11 @@ async function applyMigration(conn: Connection, filePath: string, fileName: stri
 // runner method
 async function runMigrations(): Promise<void> {
   const conn = await connect();
+  logger.info(`Connected to database`)
+
   // check if migration file exists, or create
   await validateMigrationsTable(conn);
+  logger.info('Validated migrations table')
 
   // define the migration directory
   const migrationDir = path.join(__dirname, '..', 'migrations');
@@ -84,7 +104,7 @@ async function runMigrations(): Promise<void> {
   // crosscheck which migration was already applied
   for (const migrationFile of migrationFiles) {
     if (appliedMigrations.includes(migrationFile)) {
-      console.log(`Already applied migration: ${migrationFile}`)
+      logger.info(`Skipping already applied ${migrationFile}`)
       continue;
     }
     // apply the ones not already applied
@@ -92,11 +112,12 @@ async function runMigrations(): Promise<void> {
     await applyMigration(conn, filePath, migrationFile);
   }
 
+  logger.info("Closing database connection")
   await conn.end()
 }
 
 runMigrations().catch(err => {
-  console.log("Running migration tool")
-  console.error('Migration runner failed:', err)
+  logger.info("Running migration tool")
+  logger.error('Migration runner failed:', err)
   process.exit(1);
 });

@@ -8,7 +8,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "dotenv -e .env -- node src/migrate.ts",
     "start:local": "dotenv -e .local.env -- node src/migrate.ts",
-    
     "docker:reset": "docker-compose down -v && docker-compose up -d --build"
   },
   "repository": {
@@ -24,7 +23,9 @@
   "dependencies": {
     "@types/typescript": "^0.4.29",
     "dotenv": "^17.2.1",
-    "mysql2": "^3.14.3"
+    "mysql2": "^3.14.3",
+    "pino": "^9.7.0",
+    "pino-pretty": "^13.1.1"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
