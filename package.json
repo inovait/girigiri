@@ -5,10 +5,11 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "dotenv -e .env -- node src/migrate.ts",
-    "start:local": "dotenv -e .local.env -- node src/migrate.ts",
-    "docker:reset": "docker-compose down -v && docker-compose up -d --build"
+    "dev": "tsx src/migrate.ts",
+    "build": "tsc",
+    "start": "dotenv -e .local.env -- node src/migrate.ts",
+    "docker:reset": "docker-compose down -v && docker-compose up -d --build",
+    "docker:enter": "docker exec -it node-app /bin/sh"
   },
   "repository": {
     "type": "git",
@@ -32,6 +33,7 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.2.0",
     "dotenv-cli": "^10.0.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.9.2"
   }
 }
