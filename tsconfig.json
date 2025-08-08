@@ -2,17 +2,19 @@
   "include": ["src/**/*"],
   "compilerOptions": {
     // File Layout
-    "rootDir": "./src",
-    "outDir": "./dist",
+    "rootDir": "src",
+    "outDir": "dist",
 
     // Environment Settings
     "module": "nodenext",
-    "target": "esnext",
+    "target": "ES2020",
+    "moduleResolution": "nodenext",
 
     // For nodejs:
     "lib": ["esnext"],
     "types": ["node", "express", "dotenv"],
     "typeRoots": ["./node_modules/@types"],
+    
     // Output Options
     "sourceMap": true,
     "declaration": true,
@@ -30,6 +32,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
+    "allowImportingTsExtensions": false,
 
     // Module Options
     "jsx": "react-jsx",
@@ -41,6 +44,8 @@
 
     // Decorator Support
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "emitDeclarationOnly": false,
+    "esModuleInterop": true
   }
 }
