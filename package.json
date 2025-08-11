@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "dotenv -e .local.env -- tsx src/migrate.ts",
     "build": "tsc",
-    "migrate": "dotenv -e .local.env -- tsx src/migrate.ts",
+    "migrate": "dotenv -e .env -- tsx src/migrate.ts",
     "docker:reset": "docker compose down -v && docker compose up -d --build",
     "docker:enter": "docker exec -it node-app /bin/sh",
     "docker:add-migration-file": "docker cp ./migration/${FILENAME} my-container:/home/node/app/migrations/${FILENAME}",

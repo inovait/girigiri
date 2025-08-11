@@ -1,1 +1,59 @@
 # girigiri
+
+A simple applicaton that triggers migrations based on the defined sql files.
+If a query fails, it safely rollsback the last changes. 
+The successful migrations are inserted into a migrations table.
+
+## Prerequisites
+Before you begin, ensure you have the following installed on your machine:
+
+- Node.js (v18.x or higher is recommended)
+- npm or Yarn
+
+## Configuration
+
+Create a .env file:
+Copy the .local.env file and rename it to .env. Fill in your environment-specific variables.
+
+```sh
+DB_HOST: The host address of the mysql instance
+PORT: The port of the mysql instance.
+DB_USER: The user of the mysql instance.
+DB_PASSWORD: The password of the mysql instance.
+DB_NAME: The name of the mysql database
+```
+
+## Installation
+Follow these steps to get the project up and running locally:
+
+Clone the repository;
+
+```sh
+git clone https://github.com/inovait/girigiri.git
+cd girigiri
+```
+
+Install dependencies:
+
+```sh
+npm install
+or
+yarn install
+```
+
+## Usage
+Run the application with the following command:
+```sh
+    npm run migrate or npm run dev ( for local instance - setup the .local.env accordingly)
+```
+
+To run using docker, use the following command;
+```sh
+    npm run docker:reset
+```
+
+### Additional info
+To check which migrations were successful, please query your database with;
+```sh
+    Select * from migrations
+```
