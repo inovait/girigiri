@@ -5,11 +5,13 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/migrate.ts",
+    "dev": "dotenv -e .local.env -- tsx src/migrate.ts",
     "build": "tsc",
-    "start": "dotenv -e .local.env -- node src/migrate.ts",
-    "docker:reset": "docker-compose down -v && docker-compose up -d --build",
-    "docker:enter": "docker exec -it node-app /bin/sh"
+    "migrate": "dotenv -e .local.env -- tsx src/migrate.ts",
+    "docker:reset": "docker compose down -v && docker compose up -d --build",
+    "docker:enter": "docker exec -it node-app /bin/sh",
+    "docker:add-migration-file": "docker cp ./migration/${FILENAME} my-container:/home/node/app/migrations/${FILENAME}",
+    "docker:migrate": "docker run node-app node dist/migrate.js"
   },
   "repository": {
     "type": "git",
