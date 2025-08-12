@@ -6,6 +6,7 @@ import * as mysql from 'mysql2/promise'
 import type { Connection, RowDataPacket } from 'mysql2/promise'
 import { validateEnvVar } from './helpers.js';
 import logger from "./logger.js"
+import MySqlDatabaseClient from './database/MySqlDatabaseClient.js';
 
 dotenv.config()
 const __filename = fileURLToPath(import.meta.url);
@@ -16,7 +17,8 @@ const {
   DB_USER,
   DB_PASSWORD,
   DB_NAME,
-  DB_PORT
+  DB_PORT,
+  DB_PROVIDER
 } = process.env;
 
 type MigrationRow = { name: string} & RowDataPacket;
@@ -110,7 +112,17 @@ async function applyMigration(conn: Connection, filePath: string, fileName: stri
 // runner method
 async function runMigrations(): Promise<void> {
   let conn;
+  let provider = validateEnvVar('DB_PROVIDER', DB_PROVIDER)
+
   try {
+
+     if(provider === 'mysql' ) {
+        conn = new MySqlDatabaseClient()
+     } else {
+        conn = new PostgresDatabaseClient()
+     }
+
+
       conn = await connect();
       logger.info(`Connected to database`)
 
