@@ -13,7 +13,7 @@ Before you begin, ensure you have the following installed on your machine:
 ## Configuration
 
 Create a .env file:
-Copy the .env.example file and rename it to .env. Fill in your environment-specific variables.
+Copy the .env.example file and rename it to local.env. Fill in your environment-specific variables. (for local development)
 
 ```sh
 [DB_VALUES]
@@ -50,6 +50,11 @@ yarn install
 Run the application with the following command:
 ```sh
     npm run migrate or npm run dev ( for local instance - setup the .local.env accordingly)
+```
+
+Run the sql schema dump with the following command:
+```sh
+    npm run dump:schema
 ```
 
 To run using docker, use the following command;
