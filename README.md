@@ -13,14 +13,19 @@ Before you begin, ensure you have the following installed on your machine:
 ## Configuration
 
 Create a .env file:
-Copy the .local.env file and rename it to .env. Fill in your environment-specific variables.
+Copy the .env.example file and rename it to .env. Fill in your environment-specific variables.
 
 ```sh
-DB_HOST: The host address of the mysql instance
-PORT: The port of the mysql instance.
-DB_USER: The user of the mysql instance.
-DB_PASSWORD: The password of the mysql instance.
-DB_NAME: The name of the mysql database
+[DB_VALUES]
+DB_HOST=dbHost
+DB_PORT=dbPort
+DB_USER=dbUser
+DB_PASSWORD=dbPassword
+DB_NAME=dbName
+
+[SQL_DUMP]
+NO_COMMENTS=false # with or without comments
+NO_TRAIL=false # with or without table options
 ```
 
 ## Installation
