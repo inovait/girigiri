@@ -17,3 +17,9 @@ export function removeSqlComments(sql: string): string {
     .replace(/^\s*$(?:\r\n?|\n)/gm, '')
     .trim();
 }
+
+// change the env value to a boolean value 
+export function envToBool(value: string): Boolean {
+  if (!value) return false;
+  return ["true", "1", "yes", "on"].includes(value.toLowerCase());
+}
