@@ -29,7 +29,6 @@ async function dump_table(table: string) {
     const outputPath = path.join(outputDir, `${table}.sql`);
     const args = [
         `-u ${DB_USER}`,
-        `-p${DB_PASSWORD}`,
         `-h ${DB_HOST}`,
         `-P ${DB_PORT}`,
         '--no-data',
@@ -46,10 +45,9 @@ async function dump_table(table: string) {
     if (_NO_TRAIL) mysqldumpCmd = mysqldumpCmd + sedCmd;
     // build the command
     const dumpCommand = `${mysqldumpCmd} > ${outputPath}`
-
     return new Promise<void>((resolve, reject) => {
         // exec the dump command - dont allow the variables to be outputed
-        exec(dumpCommand, (error, _stdout, _stderr) => {
+        exec(dumpCommand, {env: { ...process.env, MYSQL_PWD: DB_PASSWORD}}, (error, _stdout, _stderr) => {
             if (error) {
                 logger.error(`Error dumping table ${table}: ${error.message}`);
                 return reject(error);
@@ -73,8 +71,8 @@ async function dump_table(table: string) {
 // get the list of tables
 async function get_tables() {
     try {
-        const listTablesCmd = `mysql -N -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} -e "SHOW TABLES;" ${DB_NAME}`;
-        const tableListOutput = execSync(listTablesCmd, { encoding: 'utf8' });
+        const listTablesCmd = `mysql -N -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -e "SHOW TABLES;" ${DB_NAME}`;
+        const tableListOutput = execSync(listTablesCmd, {env: {...process.env, MYSQL_PWD: DB_PASSWORD}, encoding: 'utf8'});
 
         // split the output into the list of tables
         return tableListOutput.trim().split('\n').filter(Boolean);
