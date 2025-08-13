@@ -28,6 +28,12 @@ let _NO_TRAIL = envToBool(NO_TRAIL!)
 async function dump_table(table: string) {
     const outputPath = path.join(outputDir, `${table}.sql`);
     const args = [
+        `-u ${DB_USER}`,
+        `-p${DB_PASSWORD}`,
+        `-h ${DB_HOST}`,
+        `-P ${DB_PORT}`,
+        '--no-data',
+        '--compact',
         DB_NAME,
         table // dump this table only
     ];
@@ -43,7 +49,7 @@ async function dump_table(table: string) {
 
     return new Promise<void>((resolve, reject) => {
         // exec the dump command - dont allow the variables to be outputed
-        exec(dumpCommand, { env: { ...process.env, MYSQL_USER: DB_USER, MYSQL_HOST: DB_HOST, MYSQL_TCP_PORT: DB_PORT, MYSQL_PWD: DB_PASSWORD }, }, (error, _stdout, _stderr) => {
+        exec(dumpCommand, (error, _stdout, _stderr) => {
             if (error) {
                 logger.error(`Error dumping table ${table}: ${error.message}`);
                 return reject(error);
@@ -67,14 +73,9 @@ async function dump_table(table: string) {
 // get the list of tables
 async function get_tables() {
     try {
+        const listTablesCmd = `mysql -N -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} -e "SHOW TABLES;" ${DB_NAME}`;
+        const tableListOutput = execSync(listTablesCmd, { encoding: 'utf8' });
 
-        // table list command
-        const listTablesCmd = `mysql -N -e "SHOW TABLES;" ${DB_NAME}`;
-        // execute command to dump all the tables - dont allow the variables to be outputed
-        const tableListOutput = execSync(listTablesCmd, {
-            env:
-                { ...process.env, MYSQL_USER: DB_USER, MYSQL_HOST: DB_HOST, MYSQL_TCP_PORT: DB_PORT, MYSQL_PWD: DB_PASSWORD }, encoding: 'utf8'
-        });
         // split the output into the list of tables
         return tableListOutput.trim().split('\n').filter(Boolean);
     } catch (err: any) {
