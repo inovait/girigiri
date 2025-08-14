@@ -1,6 +1,3 @@
-DROP DATABASE IF EXISTS employees;
-CREATE DATABASE IF NOT EXISTS employees;
-
 DROP TABLE IF EXISTS salaries, titles, dept_emp, dept_manager, departments, employees;
 
 
@@ -58,6 +55,8 @@ CREATE TABLE salaries (
     FOREIGN KEY (emp_no) REFERENCES employees (emp_no) ON DELETE CASCADE,
     PRIMARY KEY (emp_no, from_date)
 ); 
+
+
 
 CREATE OR REPLACE VIEW dept_emp_latest_date AS
     SELECT emp_no, MAX(from_date) AS from_date, MAX(to_date) AS to_date
