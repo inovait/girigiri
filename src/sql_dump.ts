@@ -27,7 +27,7 @@ let _NO_TRAIL = envToBool(NO_TRAIL!)
 // dumpo the table
 async function dump_table(table: string) {
     const outputPath = path.join(outputDir, `${table}.sql`);
-    const args = [
+    let args = [
         `-u ${DB_USER}`,
         `-h ${DB_HOST}`,
         `-P ${DB_PORT}`,
@@ -37,6 +37,10 @@ async function dump_table(table: string) {
         table // dump this table only
     ];
 
+    if (table === 'migrations') {
+        // Filter out the '--no-data' argument
+        args = args.filter(arg => arg !== '--no-data');
+    }
     // build the command from the arguments
     let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
     // use the pipe to remove trailing 
