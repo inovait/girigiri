@@ -19,7 +19,7 @@ const {
 
 
 // predefined folder for table schemas
-const outputDir = 'schemas';
+const outputDir = process.env['SCHEMA_OUTPUT_DIR'] || 'schemas';
 let _NO_COMMENTS = envToBool(NO_COMMENTS!)
 let _NO_TRAIL = envToBool(NO_TRAIL!)
 
@@ -57,11 +57,19 @@ async function dump_table(table: string) {
                 logger.warn(`Stderr for ${table}: ${_stderr}`);
             }
 
-            // clean the file of comments if env variable set
-            const sqlContent = fs.readFileSync(outputPath, 'utf8');
-            if (_NO_COMMENTS) logger.info("Removing comments from sql content")
-            let cleanSqlContent = _NO_COMMENTS ? removeSqlComments(sqlContent) : sqlContent
-            fs.writeFileSync(outputPath, cleanSqlContent);
+            
+            // read dump content
+            let sqlContent = fs.readFileSync(outputPath, 'utf8');
+
+            // optionally remove comments
+            if (_NO_COMMENTS) {
+                logger.info("Removing comments from SQL content");
+                sqlContent = removeSqlComments(sqlContent);
+            }
+
+            // wrap dump in FK disable/enable
+            sqlContent = `SET FOREIGN_KEY_CHECKS=0;\n${sqlContent}\nSET FOREIGN_KEY_CHECKS=1;`;
+            fs.writeFileSync(outputPath, sqlContent);
 
             logger.info(`Dumped table schema to ${outputPath}`);
             resolve();
