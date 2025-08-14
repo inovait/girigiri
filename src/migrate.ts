@@ -72,7 +72,7 @@ async function connect(): Promise<Connection>{
 // check if mig table exists
 async function validateMigrationsTable(conn: Connection): Promise<void> {
     logger.info('Validating migrations table')
-    const initSqlPath = path.join(__dirname, '..', 'migrations', 'init_migrations.sql');
+    const initSqlPath = path.join(__dirname, '..', 'database', 'init_migrations.sql');
     
     if (!fs.existsSync(initSqlPath)) { // check if exists
       throw new Error(`Missing migration init file at: ${initSqlPath}`);
