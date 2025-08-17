@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "dotenv -e .local.env -- tsx src/migrate.ts",
     "dump:schema": "dotenv -e .env -- tsx src/sql_dump.ts",
+    "check:migrations": "bash ./scripts/basic_migrations.sh",
+    "check:migrations:diff": "bash ./scripts/migration_with_diff.sh", 
     "build": "tsc",
     "migrate": "dotenv -e .env -- tsx src/migrate.ts",
     "docker:reset": "docker compose down -v && docker compose up -d --build",
