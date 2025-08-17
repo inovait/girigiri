@@ -67,3 +67,13 @@ To check which migrations were successful, please query your database with;
 ```sh
     Select * from migrations
 ```
+
+To generate a dump of a temp migrated database run;
+```sh
+    npm run check:migrations
+```
+
+To generate a diff the migrations would create in a log file run;
+```sh
+    npm run check:migrations:diff
+```
