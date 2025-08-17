@@ -36,10 +36,12 @@ trap 'echo "Cleaning up temporary database: $TMP_DB_NAME"; \
   mysql --defaults-extra-file="$TMP_MY_CNF" -e "DROP DATABASE IF EXISTS $TMP_DB_NAME;"' EXIT
 
 echo "Restoring schema into temporary database"
-for sql_file in "$TMP_DIR"/*.sql; do
-  echo "Restoring $sql_file..."
-  mysql --defaults-extra-file="$TMP_MY_CNF" "$TMP_DB_NAME" < "$sql_file"
-done
+mysql --defaults-extra-file="$TMP_MY_CNF" "$TMP_DB_NAME" <<EOF
+SET FOREIGN_KEY_CHECKS = 0;
+$(for sql_file in "$TMP_DIR"/*.sql; do cat "$sql_file"; echo; done)
+SET FOREIGN_KEY_CHECKS = 1;
+EOF
+
 
 # override DB env variable to point to the temp database
 export DB_NAME="$TMP_DB_NAME"
