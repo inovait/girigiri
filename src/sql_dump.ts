@@ -71,8 +71,6 @@ async function dump_table(table: string) {
                 sqlContent = removeSqlComments(sqlContent);
             }
 
-            // wrap dump in FK disable/enable
-            sqlContent = `SET FOREIGN_KEY_CHECKS=0;\n${sqlContent}\nSET FOREIGN_KEY_CHECKS=1;`;
             fs.writeFileSync(outputPath, sqlContent);
 
             logger.info(`Dumped table schema to ${outputPath}`);
