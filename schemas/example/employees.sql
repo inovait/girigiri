@@ -1,4 +1,3 @@
-SET FOREIGN_KEY_CHECKS=0;
 CREATE TABLE `employees` (
   `emp_no` int NOT NULL,
   `birth_date` date NOT NULL,
@@ -8,4 +7,3 @@ CREATE TABLE `employees` (
   `hire_date` date NOT NULL,
   PRIMARY KEY (`emp_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-SET FOREIGN_KEY_CHECKS=1;
