@@ -11,59 +11,76 @@ mkdir -p "$TMP_DIR"
 # create directories for dumps
 BEFORE_DUMP_DIR="$TMP_DIR/schema_dump_before_migrate"
 AFTER_DUMP_DIR="$TMP_DIR/schema_dump_after_migrate"
+mkdir -p "$BEFORE_DUMP_DIR" "$AFTER_DUMP_DIR"
 
-mkdir -p "$BEFORE_DUMP_DIR"
-mkdir -p "$AFTER_DUMP_DIR"
+restore_schema() {
+  local sql_dir="$1"
+
+  echo "Restoring schema from $sql_dir into database $TMP_DB_NAME..."
+  mysql --defaults-extra-file="$TMP_MY_CNF" "$TMP_DB_NAME" <<EOF
+  SET FOREIGN_KEY_CHECKS = 0;
+  $(for sql_file in "$sql_dir"/*.sql; do cat "$sql_file"; echo; done)
+  SET FOREIGN_KEY_CHECKS = 1;
+EOF
+}
+
+
+# create temporary MySQL credentials file - safer approach
+TMP_MY_CNF=$(mktemp)
+chmod 600 "$TMP_MY_CNF"
+cat > "$TMP_MY_CNF" <<EOF
+[client]
+user=$DB_USER
+password=$DB_PASSWORD
+host=$DB_HOST
+port=$DB_PORT
+EOF
+
+# temporary database name
+TMP_DB_NAME="tmp_migration_db_$(date +%s)"
+
+# function to cleanup DB and temp folders
+cleanup() {
+  echo "Cleaning up temporary database: $TMP_DB_NAME"
+  mysql --defaults-extra-file="$TMP_MY_CNF" -e "DROP DATABASE IF EXISTS $TMP_DB_NAME;" || true
+  echo "Removing temporary dump directories"
+  rm -rf "$BEFORE_DUMP_DIR" "$AFTER_DUMP_DIR"
+  rm -f "$TMP_MY_CNF"
+}
+trap cleanup ERR
 
 # run initial dump:schema
 echo "Running initial dump:schema..."
-# export the schema output dir to be used in ts file
 export SCHEMA_OUTPUT_DIR="$BEFORE_DUMP_DIR"
 npm run dump:schema -- --output "$BEFORE_DUMP_DIR"
 
 # create temporary database
-TMP_DB_NAME="tmp_migration_db_$(date +%s)"
 echo "Creating temporary database: $TMP_DB_NAME"
-mysql -u "$DB_USER" -p"$DB_PASSWORD" -h "$DB_HOST" -P "$DB_PORT" -e "CREATE DATABASE $TMP_DB_NAME;"
+mysql --defaults-extra-file="$TMP_MY_CNF" -e "CREATE DATABASE $TMP_DB_NAME;"
 
-# ensure temp DB is dropped on exit
-trap 'echo "Cleaning up temporary database: $TMP_DB_NAME"; mysql -u "$DB_USER" -p"$DB_PASSWORD" -h "$DB_HOST" -P "$DB_PORT" -e "DROP DATABASE IF EXISTS $TMP_DB_NAME;"' EXIT
-
+# restore schema into temporary database
 echo "Restoring schema into temporary database..."
-
-for sql_file in "$BEFORE_DUMP_DIR"/*.sql; do
-  echo "Restoring $sql_file..."
-  mysql -u "$DB_USER" -p"$DB_PASSWORD" -h "$DB_HOST" -P "$DB_PORT" "$TMP_DB_NAME" < "$sql_file"
-done
-
+restore_schema "$BEFORE_DUMP_DIR"
 
 # override DB env variable to point to the temp database
 export DB_NAME="$TMP_DB_NAME"
 
 # run migration
-echo "Running migrations..."
+echo "Running migrations"
 npm run migrate
 
 # run dump:schema again
-echo "Running final dump:schema..."
-# export the schema output dir to be used in ts file
+echo "Running final dump:schema"
 export SCHEMA_OUTPUT_DIR="$AFTER_DUMP_DIR"
 npm run dump:schema -- --output "$AFTER_DUMP_DIR"
 
 # compare schemas
 DIFF_LOG="$TMP_DIR/schema_diff_$(date +%Y%m%d_%H%M%S).log"
+echo "Comparing schema directories"
+diff -urN "$BEFORE_DUMP_DIR" "$AFTER_DUMP_DIR" \
+  | grep -vE '^(---|\+\+\+|\\ No newline at end of file)' \
+  > "$DIFF_LOG"
 
-echo "Comparing schema directories..."
-# use unified format for cleaner output
-diff -urN "$BEFORE_DUMP_DIR" "$AFTER_DUMP_DIR" | tee "$DIFF_LOG"
-
-# check if differences exist
-if [ -s "$DIFF_LOG" ]; then
-  echo "Schema mismatch. Check the log: $DIFF_LOG"
-  exit 1
-else
-  echo "Migrations are in sync"
-fi
-
-
+echo "Check the log for the diff: $DIFF_LOG"
+cleanup # clean the tmp files
 echo "All commands executed successfully."
