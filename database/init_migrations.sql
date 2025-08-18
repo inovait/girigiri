@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS migrations (
+CREATE TABLE IF NOT EXISTS migration_history (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE, -- name of the migration ?
   run_on DATETIME DEFAULT CURRENT_TIMESTAMP -- which database it ran on ?
