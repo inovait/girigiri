@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { removeSqlComments, envToBool, validateEnvVar } from './helpers.js';
 import logger from './logger.js';
+import { migrations_table } from './constants.js';
 
 dotenv.config();
 
@@ -23,10 +24,9 @@ const outputDir = process.env['SCHEMA_OUTPUT_DIR'] || 'schemas';
 let _NO_COMMENTS = envToBool(NO_COMMENTS!)
 let _NO_TRAIL = envToBool(NO_TRAIL!)
 
-
 // dumpo the table
-async function dump_table(table: string) {
-    const outputPath = path.join(outputDir, `${table}.sql`);
+async function dump_table(table: string, table_num: Number) {
+    const outputPath = path.join(outputDir, `0${table_num}_${table}.sql`);
     let args = [
         `-u ${DB_USER}`,
         `-h ${DB_HOST}`,
@@ -37,7 +37,7 @@ async function dump_table(table: string) {
         table // dump this table only
     ];
 
-    if (table === 'migrations') {
+    if (table === migrations_table) {
         // Filter out the '--no-data' argument
         args = args.filter(arg => arg !== '--no-data');
     }
@@ -118,9 +118,10 @@ async function dump_schema() {
     // get all the tables from the db schema
     let tables = await get_tables()
     // iterate over the tables and dump
-    for (const table of tables) {
+    for (let i = 0; i < tables.length; i++) {
+        const table = tables[i]
         try {
-            await dump_table(table)
+            await dump_table(table!, i)
         } catch (err: any) {
             logger.error(`Stopping table dumping due to error: ${err}`)
             throw err; // rethrow

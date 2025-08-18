@@ -6,6 +6,7 @@ import * as mysql from 'mysql2/promise'
 import type { Connection, RowDataPacket } from 'mysql2/promise'
 import { validateEnvVar } from './helpers.js';
 import logger from "./logger.js"
+import { migrations_table } from './constants.js';
 
 dotenv.config()
 const __filename = fileURLToPath(import.meta.url);
@@ -85,7 +86,7 @@ async function validateMigrationsTable(conn: Connection): Promise<void> {
 // get applied migs
 async function getAppliedMigrations(conn: Connection): Promise<string[]> {
     logger.info('Retrieving applied migrations from database')
-    const [rows] = await conn.execute<MigrationRow[]>("Select name FROM migrations");
+    const [rows] = await conn.execute<MigrationRow[]>(`Select name FROM ${migrations_table}`);
     return rows.map(row => row.name);
 }
 
@@ -96,7 +97,10 @@ async function applyMigration(conn: Connection, filePath: string, fileName: stri
     try {
         await conn.beginTransaction();
         await conn.query(sql);
-        await conn.query('INSERT INTO migrations (name) values (?)', [fileName])
+        await conn.query(
+          `INSERT INTO \`${migrations_table}\` (name) VALUES (?)`,
+          [fileName]
+        );
         await conn.commit();
         logger.info(`Applied migration: ${fileName}`)
     } catch (err: any) {
