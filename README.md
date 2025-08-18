@@ -26,6 +26,7 @@ DB_NAME=dbName
 [SQL_DUMP]
 NO_COMMENTS=false # with or without comments
 NO_TRAIL=false # with or without table options
+SCHEMA_OUTPUT_DIR=dir # output directory for schema dump 
 ```
 
 ## Installation
