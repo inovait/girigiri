@@ -11,7 +11,7 @@
     "check:migrations:diff": "bash ./scripts/migration_with_diff.sh", 
     "build": "tsc",
     "migrate": "dotenv -e .env -- tsx src/migrate.ts",
-    "docker:reset": "docker compose down -v && docker compose up -d --build",
+    "docker:reset": "docker compose --env-file .env down -v && docker compose --env-file .env up -d --build",
     "docker:enter": "docker exec -it node-app /bin/sh",
     "docker:add-migration-file": "docker cp ./migration/${FILENAME} my-container:/home/node/app/migrations/${FILENAME}",
     "docker:migrate": "docker run node-app node dist/migrate.js"
