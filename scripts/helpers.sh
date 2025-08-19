@@ -41,18 +41,16 @@ create_temp_db_from_dump() {
   local prefix="$3"
 
   local temp_db="${prefix}_$(date +%s)"
-  echo "Creating temporary database: $temp_db"
+  echo "Creating temporary database: $temp_db" >&2
   mysql --defaults-extra-file="$cnf_file" -e "CREATE DATABASE $temp_db;"
 
-  # temp db dropped on exit ( and temp files )
-  trap "echo 'Dropping temp database: $temp_db'; \
-        mysql --defaults-extra-file='$cnf_file' -e 'DROP DATABASE IF EXISTS $temp_db;'; \
-        echo 'Removing dump file: $dump_file'; \
-        rm -f '$dump_file'" EXIT
+  # standard dump contains 'use' statements. Statements only after the last use might take effect
+  # via mysql, therefore we strip them out
+  sed '/^USE /d' "$dump_file" > "${dump_file}.tmp"
 
-  echo "Restoring dump into $temp_db..."
-  mysql --defaults-extra-file="$cnf_file" "$temp_db" < "$dump_file"
+  echo "Restoring dump into $temp_db..." >&2
+  mysql --defaults-extra-file="$cnf_file" "$temp_db" < "${dump_file}.tmp"
 
-  # return tmp db name
+  # Return the temp database name
   echo "$temp_db"
 }
