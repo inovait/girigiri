@@ -20,7 +20,6 @@ EOF
   echo "$tmp_cnf"
 }
 
-
 # mysql dump
 dump_mysql_db() {
   local cnf_file="$1"
@@ -30,6 +29,7 @@ dump_mysql_db() {
   echo "Dumping database $db_name into $output_file..."
   mysqldump \
     --defaults-extra-file="$cnf_file" \
+    --no-data \
     --single-transaction --routines --triggers --events \
     --databases "$db_name" > "$output_file"
 }
