@@ -27,9 +27,6 @@ dump_mysql_db "$TMP_MY_CNF_MIG" "$DB_MIGRATION_NAME" "db_migration_dump.sql"
 TEMP_DB=$(create_temp_db_from_dump "$TMP_MY_CNF" "db_dump.sql" "tmp_main")
 TEMP_DB_MIG=$(create_temp_db_from_dump "$TMP_MY_CNF_MIG" "db_migration_dump.sql" "tmp_migration")
 
-# create temporary database
-TEMP_DB=$(create_temp_db_from_dump "$TMP_MY_CNF" "db_dump.sql" "tmp_main")
-TEMP_DB_MIG=$(create_temp_db_from_dump "$TMP_MY_CNF_MIG" "db_migration_dump.sql" "tmp_migration")
 
 trap '
 echo "Dropping temporary databases..."
