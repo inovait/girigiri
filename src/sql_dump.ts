@@ -25,8 +25,8 @@ let _NO_COMMENTS = envToBool(NO_COMMENTS!)
 let _NO_TRAIL = envToBool(NO_TRAIL!)
 
 // dumpo the table
-async function dump_table(table: string, table_num: Number) {
-    const outputPath = path.join(outputDir, `0${table_num}_${table}.sql`);
+async function dump_table(table: string) {
+    const outputPath = path.join(outputDir, `${table}.sql`);
     let args = [
         `-u ${DB_USER}`,
         `-h ${DB_HOST}`,
@@ -118,19 +118,19 @@ async function dump_schema() {
     // get all the tables from the db schema
     let tables = await get_tables()
     // iterate over the tables and dump
-    for (let i = 0; i < tables.length; i++) {
-        const table = tables[i]
-        try {
-            await dump_table(table!, i)
+    tables.forEach(async table => {
+         try {
+            await dump_table(table)
         } catch (err: any) {
             logger.error(`Stopping table dumping due to error: ${err}`)
             throw err; // rethrow
         }
-    }
+    });
 }
 
 async function validateEnvVariables(): Promise<void> {
     logger.info('Validating env variables')
+    // main database check
     validateEnvVar('DB_HOST', DB_HOST)
     validateEnvVar('DB_PORT', DB_PORT)
     validateEnvVar('DB_USER', DB_USER)
