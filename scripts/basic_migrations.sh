@@ -1,3 +1,5 @@
+source ./scripts/helpers.sh
+
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -8,50 +10,32 @@ export $(grep -v '^#' .env | xargs)
 TMP_DIR="${SCHEMA_OUTPUT_DIR:-schemas}"
 mkdir -p "$TMP_DIR"
 
+
+# create temporary MySQL credentials file 
+TMP_MY_CNF=$(create_tmp_my_cnf "$DB_USER" "$DB_PASSWORD" "$DB_HOST" "$DB_PORT")
+TMP_MY_CNF_MIG=$(create_tmp_my_cnf "$DB_MIGRATION_USER" "$DB_MIGRATION_PASSWORD" "$DB_MIGRATION_HOST" "$DB_MIGRATION_PORT")
+
+# ensure temp files are deleted
+trap 'rm -f "$TMP_MY_CNF" "$TMP_MY_CNF_MIG"' EXIT
+
 # run initial dump:schema
-echo "Running initial dump:schema..."
-npm run dump:schema
+dump_mysql_db "$TMP_MY_CNF" "$DB_NAME" "db_dump.sql"
+dump_mysql_db "$TMP_MY_CNF_MIG" "$DB_MIGRATION_NAME" "db_migration_dump.sql"
 
-# create temporary MySQL credentials file - safer approach
-TMP_MY_CNF=$(mktemp)
-chmod 600 "$TMP_MY_CNF"
-cat > "$TMP_MY_CNF" <<EOF
-[client]
-user=$DB_USER
-password=$DB_PASSWORD
-host=$DB_HOST
-port=$DB_PORT
-EOF
-
-# ensure temp credentials file is removed on exit
-trap 'rm -f "$TMP_MY_CNF"' EXIT
 
 # create temporary database
-TMP_DB_NAME="tmp_migration_db_$(date +%s)"
-echo "Creating temporary database: $TMP_DB_NAME"
-mysql --defaults-extra-file="$TMP_MY_CNF" -e "CREATE DATABASE $TMP_DB_NAME;"
-
-# ensure temp DB is dropped on exit
-trap 'echo "Cleaning up temporary database: $TMP_DB_NAME"; \
-  mysql --defaults-extra-file="$TMP_MY_CNF" -e "DROP DATABASE IF EXISTS $TMP_DB_NAME;"' EXIT
-
-echo "Restoring schema into temporary database"
-mysql --defaults-extra-file="$TMP_MY_CNF" "$TMP_DB_NAME" <<EOF
-SET FOREIGN_KEY_CHECKS = 0;
-$(for sql_file in "$TMP_DIR"/*.sql; do cat "$sql_file"; echo; done)
-SET FOREIGN_KEY_CHECKS = 1;
-EOF
+TEMP_DB=$(create_temp_db_from_dump "$TMP_MY_CNF" "db_dump.sql" "tmp_main")
+TEMP_DB_MIG=$(create_temp_db_from_dump "$TMP_MY_CNF_MIG" "db_migration_dump.sql" "tmp_migration")
 
 
-# override DB env variable to point to the temp database
-export DB_NAME="$TMP_DB_NAME"
+# export for tooling
+export TEMP_DB_NAME="$TEMP_DB"
+export TEMP_DB_MIGRATION_NAME="$TEMP_DB_MIG"
 
-# run migration
-echo "Running migrations"
+echo "Running migrations..."
 npm run migrate
 
-# run dump:schema again
-echo "Running final dump:schema"
+echo "Running final dump..."
 npm run dump:schema
 
 echo "All commands executed successfully."
