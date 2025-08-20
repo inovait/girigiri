@@ -20,8 +20,8 @@ trap 'rm -f "$TMP_MY_CNF" "$TMP_MY_CNF_MIG"' EXIT
 
 # run initial dump:schema
 dump_mysql_db "$TMP_MY_CNF" "$DB_NAME" "db_dump.sql"
-dump_mysql_db "$TMP_MY_CNF_MIG" "$DB_MIGRATION_NAME" "db_migration_dump.sql"
-
+# true = with data
+dump_mysql_db_table "$TMP_MY_CNF_MIG" "$DB_MIGRATION_NAME" "migration_history" "db_migration_dump.sql" "true"
 
 # create temporary database
 TEMP_DB=$(create_temp_db_from_dump "$TMP_MY_CNF" "db_dump.sql" "tmp_main")

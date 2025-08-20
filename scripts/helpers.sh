@@ -34,6 +34,26 @@ dump_mysql_db() {
     --databases "$db_name" > "$output_file"
 }
 
+dump_mysql_db_table() {
+  local cnf_file="$1"
+  local db_name="$2"
+  local table_name="$3"
+  local output_file="$4"
+  local with_data="$5"
+
+  local DUMP_FLAGS="--single-transaction --routines --triggers --events"
+  if [[ "$with_data" == "false" || "$with_data" == "false" ]]; then
+  # Structure only
+    DUMP_FLAGS="$DUMP_FLAGS --no-data"
+  fi
+
+  echo "Dumping table $db_name.$table_name into $output_file..."
+
+  mysqldump --defaults-extra-file="$cnf_file" \
+  $DUMP_FLAGS \
+  "$db_name" "$table_name" > "$output_file"
+}
+
 # create temporary db from sql dump
 create_temp_db_from_dump() {
   local cnf_file="$1"
