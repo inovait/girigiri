@@ -23,6 +23,12 @@ DB_USER=dbUser
 DB_PASSWORD=dbPassword
 DB_NAME=dbName
 
+DB_MIGRATION_HOST=dbMigHost
+DB_MIGRATION_PORT=dbMigPort
+DB_MIGRATION_USER=dbMigUser
+DB_MIGRATION_PASSWORD=dbMigPassword
+DB_MIGRATION_NAME=dbMigName
+
 [SQL_DUMP]
 NO_COMMENTS=false # with or without comments
 NO_TRAIL=false # with or without table options
@@ -58,9 +64,20 @@ Run the sql schema dump with the following command:
     npm run dump:schema
 ```
 
+Run with the following command to create the database migration history table:
+```sh
+    npm run docker:init-mig-database
+```
+
 To run using docker, use the following command;
+CAUTION: this resets the containers, do not use in production
 ```sh
     npm run docker:reset
+```
+
+Starts the mysql service in a container. If container already exists, does nothing. Defined by DB_MIGRATION parameters
+```sh
+    npm run docker:start
 ```
 
 ### Additional info
