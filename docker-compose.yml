@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    container_name: node-app
-    ports:
-      - "3000:3000"
-    depends_on:
-      - mysqldb
-    env_file:
-    - .env
   mysqldb:
     image: mysql:8.0
     container_name: mysql-db
