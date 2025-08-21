@@ -24,8 +24,8 @@ const outputDir = process.env['SCHEMA_OUTPUT_DIR'] || 'schemas';
 let _NO_COMMENTS = envToBool(NO_COMMENTS!)
 let _NO_TRAIL = envToBool(NO_TRAIL!)
 
-// dumpo the table
-async function dump_table(table: string) {
+// dumpp the table
+export async function dump_table(table: string) {
     const outputPath = path.join(outputDir, `${table}.sql`);
     let args = [
         `-u ${DB_USER}`,
@@ -80,7 +80,7 @@ async function dump_table(table: string) {
 }
 
 // get the list of tables
-async function get_tables() {
+export async function get_tables() {
     try {
         // -N skips column names
         const listTablesCmd = `mysql -N -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -e "SHOW TABLES;" ${DB_NAME}`;
@@ -128,7 +128,7 @@ async function dump_schema() {
     });
 }
 
-async function validateEnvVariables(): Promise<void> {
+export async function validateEnvVariables(): Promise<void> {
     logger.info('Validating env variables')
     // main database check
     validateEnvVar('DB_HOST', DB_HOST)

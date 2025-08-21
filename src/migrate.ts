@@ -22,10 +22,11 @@ const {
   DB_MIGRATION_PASSWORD,
   DB_MIGRATION_NAME,
   DB_MIGRATION_HOST,
-  DB_MIGRATION_PORT
+  DB_MIGRATION_PORT,
+  MIGRATIONS_DIR
 } = process.env;
 
-type MigrationRow = { name: string} & RowDataPacket;
+export type MigrationRow = { name: string} & RowDataPacket;
 
 const migrationDatabaseConfig = {
   host: validateEnvVar('DB_HOST', DB_HOST),
@@ -42,7 +43,6 @@ const migrationHistoryConfig = {
   database: validateEnvVar('DB_MIGRATION_NAME', DB_MIGRATION_NAME),
   port: validateEnvVar('DB_MIGRATION_PORT', DB_MIGRATION_PORT)
 }
-
 
 // connect to database
 async function connect(config: any): Promise<Connection>{
@@ -81,13 +81,13 @@ async function connect(config: any): Promise<Connection>{
         await new Promise(res => setTimeout(res, retryDelay))
       }
     }
-    
+
     throw new Error('Unexpected error connecting to the database');
 }
 
 
 // check if mig table exists
-async function validateMigrationsTable(conn: Connection): Promise<void> {
+export async function validateMigrationsTable(conn: Connection): Promise<void> {
     logger.info('Validating migrations table')
     const initSqlPath = path.join(__dirname, '..', 'database', 'init_migrations.sql');
     
@@ -100,7 +100,7 @@ async function validateMigrationsTable(conn: Connection): Promise<void> {
 }
 
 // get applied migs
-async function getAppliedMigrations(conn: Connection): Promise<string[]> {
+export async function getAppliedMigrations(conn: Connection): Promise<string[]> {
   //validateEnvVar('MIGRATIONS_SCHEMA', MIGRATIONS_SCHEMA);
   const [rows] = await conn.execute<MigrationRow[]>(
     `SELECT name FROM \`${DB_MIGRATION_NAME}\`.\`${migrations_table}\``
@@ -132,7 +132,7 @@ async function applyMigration(mainConnection: Connection, migrationHistoryConnec
 }
 
 // runner method
-async function runMigrations(): Promise<void> {
+export async function runMigrations(): Promise<void> {
   let mainConnection;
   let migrationHistoryConnection;
   try {
@@ -147,10 +147,15 @@ async function runMigrations(): Promise<void> {
       await validateMigrationsTable(migrationHistoryConnection);
       logger.info('Validated migration history table')
 
+      let migrationDir;
       // define the migration directory
-      const migrationDir = path.join(__dirname, '..', 'migrations');
-      // retrieve the migration files from the dir
-      const migrationFiles = fs.readdirSync(migrationDir)
+      if(MIGRATIONS_DIR === undefined || null) {
+        migrationDir = path.join(__dirname, '..', 'migrations')
+      } else {
+        migrationDir = MIGRATIONS_DIR
+      }
+   
+      const migrationFiles = fs.readdirSync(migrationDir!)
         .filter(file => file.endsWith('.sql'))
         .sort()
 
@@ -165,7 +170,7 @@ async function runMigrations(): Promise<void> {
           continue;
         }
         // apply the ones not already applied
-        const filePath = path.join(migrationDir, migrationFile);
+        const filePath = path.join(migrationDir!, migrationFile);
         await applyMigration(mainConnection, migrationHistoryConnection, filePath, migrationFile);
       }
 
