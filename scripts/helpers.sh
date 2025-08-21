@@ -47,11 +47,16 @@ dump_mysql_db_table() {
     DUMP_FLAGS="$DUMP_FLAGS --no-data"
   fi
 
-  echo "Dumping table $db_name.$table_name into $output_file..."
+  local TABLE_EXISTS
+  TABLE_EXISTS=$(mysql --defaults-extra-file="$cnf_file" -sse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db_name' AND table_name='$table_name';")
 
-  mysqldump --defaults-extra-file="$cnf_file" \
-  $DUMP_FLAGS \
-  "$db_name" "$table_name" > "$output_file"
+  if [[ "$TABLE_EXISTS" -eq 1 ]]; then
+    echo "Dumping table $db_name.$table_name into $output_file..."
+    mysqldump --defaults-extra-file="$cnf_file" $DUMP_FLAGS "$db_name" "$table_name" > "$output_file"
+    echo "Dump completed."
+  else
+    echo "Table $db_name.$table_name does not exist. Skipping dump."
+  fi
 }
 
 # create temporary db from sql dump
@@ -60,7 +65,8 @@ create_temp_db_from_dump() {
   local dump_file="$2"
   local prefix="$3"
 
-  local temp_db="${prefix}_$(date +%s)"
+  local temp_db="$prefix"
+  #local temp_db="${prefix}_$(date +%s)"
   echo "Creating temporary database: $temp_db" >&2
   mysql --defaults-extra-file="$cnf_file" -e "CREATE DATABASE $temp_db;"
 
