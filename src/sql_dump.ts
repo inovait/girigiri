@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { removeSqlComments, envToBool, validateEnvVar } from './helpers.js';
 import logger from './logger.js';
+import { migrations_table } from './constants.js';
 
 dotenv.config();
 
@@ -19,15 +20,14 @@ const {
 
 
 // predefined folder for table schemas
-const outputDir = 'schemas';
+const outputDir = process.env['SCHEMA_OUTPUT_DIR'] || 'schemas';
 let _NO_COMMENTS = envToBool(NO_COMMENTS!)
 let _NO_TRAIL = envToBool(NO_TRAIL!)
 
-
-// dumpo the table
-async function dump_table(table: string) {
+// dumpp the table
+export async function dump_table(table: string) {
     const outputPath = path.join(outputDir, `${table}.sql`);
-    const args = [
+    let args = [
         `-u ${DB_USER}`,
         `-h ${DB_HOST}`,
         `-P ${DB_PORT}`,
@@ -37,6 +37,10 @@ async function dump_table(table: string) {
         table // dump this table only
     ];
 
+    if (table === migrations_table) {
+        // Filter out the '--no-data' argument
+        args = args.filter(arg => arg !== '--no-data');
+    }
     // build the command from the arguments
     let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
     // use the pipe to remove trailing 
@@ -57,11 +61,17 @@ async function dump_table(table: string) {
                 logger.warn(`Stderr for ${table}: ${_stderr}`);
             }
 
-            // clean the file of comments if env variable set
-            const sqlContent = fs.readFileSync(outputPath, 'utf8');
-            if (_NO_COMMENTS) logger.info("Removing comments from sql content")
-            let cleanSqlContent = _NO_COMMENTS ? removeSqlComments(sqlContent) : sqlContent
-            fs.writeFileSync(outputPath, cleanSqlContent);
+            
+            // read dump content
+            let sqlContent = fs.readFileSync(outputPath, 'utf8');
+
+            // optionally remove comments
+            if (_NO_COMMENTS) {
+                logger.info("Removing comments from SQL content");
+                sqlContent = removeSqlComments(sqlContent);
+            }
+
+            fs.writeFileSync(outputPath, sqlContent);
 
             logger.info(`Dumped table schema to ${outputPath}`);
             resolve();
@@ -70,7 +80,7 @@ async function dump_table(table: string) {
 }
 
 // get the list of tables
-async function get_tables() {
+export async function get_tables() {
     try {
         // -N skips column names
         const listTablesCmd = `mysql -N -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -e "SHOW TABLES;" ${DB_NAME}`;
@@ -108,18 +118,19 @@ async function dump_schema() {
     // get all the tables from the db schema
     let tables = await get_tables()
     // iterate over the tables and dump
-    for (const table of tables) {
-        try {
+    tables.forEach(async table => {
+         try {
             await dump_table(table)
         } catch (err: any) {
             logger.error(`Stopping table dumping due to error: ${err}`)
             throw err; // rethrow
         }
-    }
+    });
 }
 
-async function validateEnvVariables(): Promise<void> {
+export async function validateEnvVariables(): Promise<void> {
     logger.info('Validating env variables')
+    // main database check
     validateEnvVar('DB_HOST', DB_HOST)
     validateEnvVar('DB_PORT', DB_PORT)
     validateEnvVar('DB_USER', DB_USER)

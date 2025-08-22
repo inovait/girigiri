@@ -23,9 +23,16 @@ DB_USER=dbUser
 DB_PASSWORD=dbPassword
 DB_NAME=dbName
 
+DB_MIGRATION_HOST=dbMigHost
+DB_MIGRATION_PORT=dbMigPort
+DB_MIGRATION_USER=dbMigUser
+DB_MIGRATION_PASSWORD=dbMigPassword
+DB_MIGRATION_NAME=dbMigName
+
 [SQL_DUMP]
 NO_COMMENTS=false # with or without comments
 NO_TRAIL=false # with or without table options
+SCHEMA_OUTPUT_DIR=dir # output directory for schema dump 
 ```
 
 ## Installation
@@ -47,23 +54,62 @@ yarn install
 ```
 
 ## Usage
-Run the application with the following command:
-```sh
-    npm run migrate or npm run dev ( for local instance - setup the .local.env accordingly)
-```
-
 Run the sql schema dump with the following command:
 ```sh
     npm run dump:schema
 ```
 
+Run with the following command to create the database migration history table:
+```sh
+    npm run docker:init-mig-database
+```
+
+Run the migration with the following command:
+```sh
+    npm run migrate or npm run dev ( for local instance - setup the .local.env accordingly)
+```
+Note: database parameters defined inside env variables.
+
 To run using docker, use the following command;
+CAUTION: this resets the containers, do not use in production
 ```sh
     npm run docker:reset
 ```
+
+Starts the mysql service in a container. If container already exists, does nothing. Defined by DB_MIGRATION parameters
+```sh
+    npm run docker:start
+```
+
+## Testing
+To use tests run:
+
+```sh
+    npm run tests
+```
+
+You will need to setup a .env.integration file and have a working database instance:
+The lower part is needed for the tests to grab the appropriate files
+```sh
+    SCHEMA_OUTPUT_DIR=src/tests/integration/fixtures
+    MIGRATIONS_DIR=src/tests/integration/fixtures/migrations
+```
+
+
 
 ### Additional info
 To check which migrations were successful, please query your database with;
 ```sh
     Select * from migrations
 ```
+
+To generate a dump of a temp migrated database run;
+```sh
+    npm run check:migrations
+```
+
+To generate a diff the migrations would create in a log file run;
+```sh
+    npm run check:migrations:diff
+```
+

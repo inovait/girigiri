@@ -5,13 +5,17 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "dev": "dotenv -e .local.env -- tsx src/migrate.ts",
     "dump:schema": "dotenv -e .env -- tsx src/sql_dump.ts",
+    "check:migrations": "bash ./scripts/basic_migrations.sh",
+    "check:migrations:diff": "bash ./scripts/migration_with_diff.sh",
     "build": "tsc",
     "migrate": "dotenv -e .env -- tsx src/migrate.ts",
-    "docker:reset": "docker compose down -v && docker compose up -d --build",
+    "docker:init-mig-database": "bash ./scripts/init_migration_database.sh",
+    "docker:start": "docker compose --env-file .env up -d --build",
+    "docker:reset": "bash ./scripts/docker_reset.sh",
     "docker:enter": "docker exec -it node-app /bin/sh",
-    "docker:add-migration-file": "docker cp ./migration/${FILENAME} my-container:/home/node/app/migrations/${FILENAME}",
     "docker:migrate": "docker run node-app node dist/migrate.js"
   },
   "repository": {
@@ -35,8 +39,12 @@
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.2.0",
+    "cross-env": "^10.0.0",
     "dotenv-cli": "^10.0.0",
+    "jest": "^30.0.5",
+    "ts-jest": "^29.4.1",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2"
   }
