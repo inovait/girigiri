@@ -10,20 +10,17 @@ else
   export $(grep -v '^#' .env | xargs)
 fi
 
-
 # default behavior: drop DB at the end
 DROP_TMP_DB=true
 
 # parse optional flag - used for testing purposes
 if [[ "${2:-}" == "--keep-tmp-db" ]]; then
-  echo "false baby"
   DROP_TMP_DB=false
 fi
 
 # determin tmp dir from env_variables or else use schemas
 TMP_DIR="${SCHEMA_OUTPUT_DIR:-schemas}"
 mkdir -p "$TMP_DIR"
-
 
 # create temporary MySQL credentials file 
 TMP_MY_CNF=$(create_tmp_my_cnf "$DB_USER" "$DB_PASSWORD" "$DB_HOST" "$DB_PORT")
@@ -32,7 +29,6 @@ TMP_MY_CNF_MIG=$(create_tmp_my_cnf "$DB_MIGRATION_USER" "$DB_MIGRATION_PASSWORD"
 # ensure temp files are deleted
 trap 'rm -f "$TMP_MY_CNF" "$TMP_MY_CNF_MIG"' EXIT
 
-echo 
 # run initial dump:schema
 dump_mysql_db "$TMP_MY_CNF" "$DB_NAME" "db_dump.sql"
 # true = with data

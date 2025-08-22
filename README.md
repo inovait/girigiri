@@ -54,11 +54,6 @@ yarn install
 ```
 
 ## Usage
-Run the application with the following command:
-```sh
-    npm run migrate or npm run dev ( for local instance - setup the .local.env accordingly)
-```
-
 Run the sql schema dump with the following command:
 ```sh
     npm run dump:schema
@@ -68,6 +63,12 @@ Run with the following command to create the database migration history table:
 ```sh
     npm run docker:init-mig-database
 ```
+
+Run the migration with the following command:
+```sh
+    npm run migrate or npm run dev ( for local instance - setup the .local.env accordingly)
+```
+Note: database parameters defined inside env variables.
 
 To run using docker, use the following command;
 CAUTION: this resets the containers, do not use in production
@@ -79,6 +80,22 @@ Starts the mysql service in a container. If container already exists, does nothi
 ```sh
     npm run docker:start
 ```
+
+## Testing
+To use tests run:
+
+```sh
+    npm run tests
+```
+
+You will need to setup a .env.integration file and have a working database instance:
+The lower part is needed for the tests to grab the appropriate files
+```sh
+    SCHEMA_OUTPUT_DIR=src/tests/integration/fixtures
+    MIGRATIONS_DIR=src/tests/integration/fixtures/migrations
+```
+
+
 
 ### Additional info
 To check which migrations were successful, please query your database with;
@@ -95,3 +112,4 @@ To generate a diff the migrations would create in a log file run;
 ```sh
     npm run check:migrations:diff
 ```
+
