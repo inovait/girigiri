@@ -6,8 +6,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Where to store logs
-const errorLogFilePath = path.join(__dirname, '..', 'logs', 'error.log');
-const logFilePath = path.join(__dirname, '..', 'logs', 'app.log');
+const errorLogFilePath = path.join(__dirname, '..','..', 'logs', 'error.log');
+const logFilePath = path.join(__dirname, '..', '..', 'logs', 'app.log');
 
 const logger = pino({
   level: 'info',
