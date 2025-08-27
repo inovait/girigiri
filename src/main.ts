@@ -4,47 +4,58 @@ import { MigrationService } from "./service/migration.service.ts";
 import { SchemaDumpService } from "./service/schema-dump.service.ts";
 import { ConfigManager } from "./manager/config.manager.ts";
 import { DatabaseManager } from "./manager/database.manager.ts";
-const program = new Command();
 
+const program = new Command();
 
 program
   .command("migrate")
   .description("Run database migrations")
   .action(async () => {
-    // load configuration data
-    // initialize database
-    // initialize service ( pass in configuration data )
-    // wrap in try catch
     try {
-      let configManager = new ConfigManager()
-      let databaseManager = new DatabaseManager()
-      let migrationService = new MigrationService(configManager, databaseManager)
-      migrationService.migrate()
-      console.log("Running migrations");
+      const configManager = ConfigManager.getInstance();
+      const databaseManager = new DatabaseManager();
+      const migrationService = new MigrationService(configManager, databaseManager);
+
+      await migrationService.migrate();
+      console.log("Migrations completed successfully");
     } catch (err) {
       console.error("Migration failed:", err);
-
+      process.exit(1);
     }
-
   });
 
 program
   .command("dump:schema")
+  .description("Dump current database schema")
   .action(async () => {
-    let configManager = new ConfigManager()
-    let databaseManager = new DatabaseManager()
-    let schemaDumpService = new SchemaDumpService(configManager, databaseManager);
-    await schemaDumpService.dumpSchema()
-    console.log('Dumping database');
+    try {
+      const configManager = ConfigManager.getInstance();
+      const databaseManager = new DatabaseManager();
+      const schemaDumpService = new SchemaDumpService(configManager, databaseManager);
+
+      await schemaDumpService.dumpSchema();
+      console.log("Schema dumped successfully");
+    } catch (err) {
+      console.error("Schema dump failed:", err);
+      process.exit(1);
+    }
   });
 
 program
   .command("check:migrations")
-  .description("Run checks")
-  .action(() => {
-    //let migrationService = new MigrationService()
-    //migrationService.validateMigrations()
-    console.log("Running migrations check");
+  .description("Check pending migrations")
+  .action(async () => {
+    try {
+      const configManager = ConfigManager.getInstance();
+      const databaseManager = new DatabaseManager();
+      const migrationService = new MigrationService(configManager, databaseManager);
+
+      await migrationService.checkMigrations();
+      console.log("Migration check completed successfully");
+    } catch (err) {
+      console.error("Migration check failed:", err);
+      process.exit(1);
+    }
   });
 
 program.parse(process.argv);
