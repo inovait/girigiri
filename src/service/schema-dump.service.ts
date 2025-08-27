@@ -6,8 +6,9 @@ import logger from "../logging/logger.ts";
 import { ConfigManager } from "../manager/config.manager.ts";
 import { DatabaseManager } from "../manager/database.manager.ts";
 import { FileManager } from "../manager/file.manager.ts";
+import { MIGRATION_HISTORY_TABLE } from "../constants/constants.ts";
+import { ERROR_MESSAGES } from "../constants/error-messages.ts";
 import type { Connection } from "mysql2/promise";
-
 
 export class SchemaDumpService {
   private databaseManager: DatabaseManager
@@ -38,7 +39,7 @@ export class SchemaDumpService {
       await runCommand(dumpCommand, this.config.mainDatabaseConfig.password)
       logger.info('Schema succesfully dumped')
     } catch (err) {
-      logger.error(`Error while dumping schema. Error: ${err}`)
+      logger.error(ERROR_MESSAGES.SCHEMA_DUMP.BULK, err);
       throw err
     }
   }
@@ -63,7 +64,7 @@ export class SchemaDumpService {
       try {
         await this.dumpTable(table, this.config.mainDatabaseConfig, this.config.fileConfig)
       } catch (err) {
-        logger.error(`Stopping table dumping due to error: ${err}`)
+        logger.error(ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR, err);
         throw err;
       }
     }
@@ -78,7 +79,7 @@ export class SchemaDumpService {
 
       return tables.map((row: any) => { return row.TABLE_NAME })
     } catch (error) {
-      logger.error("")
+      logger.error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES, error);
       throw error;
     } finally {
       mainConnection?.end();
@@ -96,7 +97,7 @@ export class SchemaDumpService {
       table
     ];
 
-    if (table === "migration_history") {
+    if (table === MIGRATION_HISTORY_TABLE) {
       args = args.filter(arg => arg !== '--no-data');
     }
 
@@ -108,7 +109,7 @@ export class SchemaDumpService {
       await runCommand(dumpCommand, this.config.mainDatabaseConfig.password)
       logger.info('Table succesfully dumped')
     } catch (err) {
-      logger.error(`Error while dumping table. Error: ${err}`)
+      logger.error(ERROR_MESSAGES.SCHEMA_DUMP.TABLE(table), err);
       throw err
     }
   }
