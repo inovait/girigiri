@@ -2,83 +2,139 @@ import dotenv from 'dotenv';
 import type { Config } from "../interface/config.interface.ts";
 import type { DatabaseConfig } from "../interface/database-config.interface.ts";
 import type { FileConfig } from "../interface/file-config.interface.ts";
+
 dotenv.config();
 
 export class ConfigManager {
-    private config: Config;
-    constructor() {
-        this.validateEnvVariables()
-        this.config = this.loadConfig()
-    }
+    private static instance: ConfigManager;
+    private config: Config | null = null;
 
-    private loadConfig() {
-        return this.loadFromEnvironment();
-    }
+    private constructor() {}
 
-    private loadFromEnvironment() {
-        return {
-            migrationDatabaseConfig: this.loadMigrationDatabaseConfig(),
-            mainDatabaseConfig: this.loadMainDatabaseConfig(),
-            fileConfig: this.loadFileConfig(),
-        };
-    }
-
-    // TODO: Add validation for env vars
-    private loadMigrationDatabaseConfig(): DatabaseConfig {
-        return {
-            user: process.env["DB_MIGRATION_USER"] || "",
-            password: process.env["DB_MIGRATION_PASSWORD"] || "",
-            host: process.env["DB_MIGRATION_HOST"] || "localhost",
-            port: parseInt(process.env["DB_MIGRATION_PORT"]!, 10) || 5432,
-            database: process.env["DB_MIGRATION_NAME"] || "",
-            waitForConnections: true,
-            multipleStatements: true,
-            connectionLimits: 10,
-            queveLimit: 0
-        };
-    }
-
-    private loadMainDatabaseConfig(): DatabaseConfig {
-        return {
-            user: process.env["DB_USER"] || "",
-            password: process.env["DB_PASSWORD"] || "",
-            host: process.env["DB_HOST"] || "localhost",
-            port: parseInt(process.env["DB_MIGRATION_PORT"]!, 10) || 5432,
-            database: process.env["DB_NAME"] || "",
-            waitForConnections: true,
-            multipleStatements: true,
-            connectionLimits: 10,
-            queveLimit: 0
-        };
-    }
-
-    private loadFileConfig(): FileConfig {
-        return {
-            schemaOutputDir: process.env["SCHEMA_OUTPUT_DIR"] || "dist/schema",
-            migrationsDir: process.env["MIGRATIONS_DIR"] || "dist/migrations",
-        };
-    }
-
-    getConfig(): Config {
-        if (this.config === null) {
-            this.loadConfig()
-            return this.config
+    public static getInstance(): ConfigManager {
+        if (!ConfigManager.instance) {
+            ConfigManager.instance = new ConfigManager();
         }
-
-        return this.config
+        return ConfigManager.instance;
     }
 
-    private validateEnvVariables(): void {
-        const requiredDbMainVars = ["DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT", "DB_NAME"]
-        const requiredDbMigrationHistoryVars = ["DB_MIGRATION_USER", "DB_MIGRATION_PASSWORD", "DB_MIGRATION_HOST", "DB_MIGRATION_PORT", "DB_MIGRATION_NAME"]
-        const requiredFileVars = ['SCHEMA_OUTPUT_DIR', 'MIGRATIONS_DIR']
-        const allRequiredVars = [
-            ...requiredDbMainVars,
-            ...requiredDbMigrationHistoryVars,
-            ...requiredFileVars
-        ]
+    public getConfig(): Config {
+        if (!this.config) {
+            this.validateEnvironmentVariables();
+            this.config = this.loadConfiguration();
+        }
+        return this.config;
+    }
 
-        let missing = allRequiredVars.filter(v => !process.env[v])
-        if (missing.length) throw new Error(`Missing env vars: ${missing.join(", ")}`);
+    public setConfig(config: Config): void {
+        this.config = config;
+    }
+
+    public setFileConfig(fileConfig: FileConfig): void {
+        this.ensureConfigLoaded();
+        this.config!.fileConfig = fileConfig;
+    }
+
+    public setMainDatabaseConfig(databaseConfig: DatabaseConfig): void {
+        this.ensureConfigLoaded();
+        this.config!.mainDatabaseConfig = databaseConfig;
+    }
+
+    public setMigrationDatabaseConfig(databaseConfig: DatabaseConfig): void {
+        this.ensureConfigLoaded();
+        this.config!.migrationDatabaseConfig = databaseConfig;
+    }
+
+    private ensureConfigLoaded(): void {
+        if (!this.config) {
+            this.config = this.getConfig();
+        }
+    }
+
+    private loadConfiguration(): Config {
+        return {
+            migrationDatabaseConfig: this.createMigrationDatabaseConfig(),
+            mainDatabaseConfig: this.createMainDatabaseConfig(),
+            fileConfig: this.createFileConfig(),
+        };
+    }
+
+    private createMigrationDatabaseConfig(): DatabaseConfig {
+        return {
+            user: this.getRequiredEnvVar('DB_MIGRATION_USER'),
+            password: this.getRequiredEnvVar('DB_MIGRATION_PASSWORD'),
+            host: this.getEnvVar('DB_MIGRATION_HOST', 'localhost'),
+            port: this.getEnvVarAsNumber('DB_MIGRATION_PORT', 5432),
+            database: this.getRequiredEnvVar('DB_MIGRATION_NAME'),
+            waitForConnections: true,
+            multipleStatements: true,
+            connectionLimit: 10,
+            queueLimit: 0 // Fixed typo: queveLimit -> queueLimit
+        };
+    }
+
+    private createMainDatabaseConfig(): DatabaseConfig {
+        return {
+            user: this.getRequiredEnvVar('DB_USER'),
+            password: this.getRequiredEnvVar('DB_PASSWORD'),
+            host: this.getEnvVar('DB_HOST', 'localhost'),
+            port: this.getEnvVarAsNumber('DB_PORT', 5432), // Fixed: was using DB_MIGRATION_PORT
+            database: this.getRequiredEnvVar('DB_NAME'),
+            waitForConnections: true,
+            multipleStatements: true,
+            connectionLimit: 10,
+            queueLimit: 0
+        };
+    }
+
+    private createFileConfig(): FileConfig {
+        return {
+            schemaOutputDir: this.getEnvVar('SCHEMA_OUTPUT_DIR', 'dist/schema'),
+            migrationsDir: this.getEnvVar('MIGRATIONS_DIR', 'dist/migrations'),
+        };
+    }
+
+    private getRequiredEnvVar(name: string): string {
+        const value = process.env[name];
+        if (!value) {
+            throw new Error(`Required environment variable ${name} is not set`);
+        }
+        return value;
+    }
+
+    private getEnvVar(name: string, defaultValue: string): string {
+        return process.env[name] || defaultValue;
+    }
+
+    private getEnvVarAsNumber(name: string, defaultValue: number): number {
+        const value = process.env[name];
+        if (!value) return defaultValue;
+        
+        const parsed = parseInt(value, 10);
+        if (isNaN(parsed)) {
+            throw new Error(`Environment variable ${name} must be a valid number, got: ${value}`);
+        }
+        return parsed;
+    }
+
+    private validateEnvironmentVariables(): void {
+        const requiredVars: Record<string, string[]> = {
+            'Main Database': ['DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME'],
+            'Migration Database': ['DB_MIGRATION_USER', 'DB_MIGRATION_PASSWORD', 'DB_MIGRATION_HOST', 'DB_MIGRATION_PORT', 'DB_MIGRATION_NAME'],
+            'File Configuration': ['SCHEMA_OUTPUT_DIR', 'MIGRATIONS_DIR']
+        };
+
+        const errors: string[] = [];
+
+        Object.entries(requiredVars).forEach(([category, vars]) => {
+            const missing = vars.filter(varName => !process.env[varName]);
+            if (missing.length > 0) {
+                errors.push(`${category}: ${missing.join(', ')}`);
+            }
+        });
+
+        if (errors.length > 0) {
+            throw new Error(`Missing required environment variables:\n${errors.map(e => `  - ${e}`).join('\n')}`);
+        }
     }
 }

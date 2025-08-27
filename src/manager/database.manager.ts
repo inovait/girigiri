@@ -1,36 +1,105 @@
 import { createConnection } from 'mysql2/promise';
-import type { Connection } from 'mysql2/promise';
-
+import type { Connection, RowDataPacket } from 'mysql2/promise';
 import type { DatabaseConfig } from '../interface/database-config.interface.ts';
 import logger from '../logging/logger.ts';
 
 export class DatabaseManager {
-    constructor(){}
-    
+    private static readonly DEFAULT_MAX_RETRIES = 5;
+    private static readonly DEFAULT_RETRY_DELAY_MS = 5000;
+
+    constructor() {}
+
     async connect(databaseConfig: DatabaseConfig): Promise<Connection> {
-        const maxRetries = 5;
-        const retryDelay = 5000; //ms
+        const maxRetries = DatabaseManager.DEFAULT_MAX_RETRIES;
+        const retryDelay = DatabaseManager.DEFAULT_RETRY_DELAY_MS;
         let retries = 0;
 
-        while(retries < maxRetries) {
+        while (retries < maxRetries) {
             try {
-                if(retries <= 0) {
-                    logger.info("Establishing connection to the database");
+                if (retries <= 0) {
+                    logger.info('Establishing connection to the database');
                 } else {
                     logger.info(`Connecting to database. Retry #${retries}`);
                 }
-                return await createConnection(databaseConfig)
+                
+                return await createConnection(databaseConfig);
             } catch (error: any) {
                 retries++;
+                
                 if (retries >= maxRetries) {
-                    logger.info("Over the maximum retry count for connecting to the database")
+                    logger.error('Exceeded maximum retry count for connecting to the database');
                     throw error;
                 }
 
-                await new Promise(res => setTimeout(res, retryDelay))
+                logger.warn(`Connection failed, retrying in ${retryDelay}ms...`);
+                await this.delay(retryDelay);
             }
         }
 
-        throw new Error("Unexpected error connecting to the database")
+        throw new Error('Unexpected error connecting to the database');
+    }
+
+    async createDatabase(connection: Connection, dbName?: string): Promise<void> {
+        if (!dbName) {
+            logger.error('Database name is required');
+            throw new Error('Database name is required');
+        }
+
+        try {
+            logger.info(`Creating database ${dbName}`);
+            await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+            logger.info(`Database ${dbName} created successfully`);
+        } catch (error) {
+            logger.error('Error creating database:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Drops the database table
+     * @param connection mysql2/promise connection
+     * @param dbName schema name being dropped
+     */
+    async dropDatabase(connection: Connection, dbName?: string): Promise<void> {
+        if (!dbName) {
+            logger.error('Database name is required');
+            throw new Error('Database name is required');
+        }
+
+        try {
+            logger.info(`Dropping database ${dbName}`);
+            await connection.query(`DROP DATABASE \`${dbName}\``);
+            logger.info(`Database ${dbName} dropped successfully`);
+        } catch (error) {
+            logger.error('Error dropping database:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Checks if table name exists
+     * @param connection mysql2/promise connection
+     * @param tableName table name being checked
+     * @returns Promise<boolean> - if exists
+     */
+    async tableExists(connection: Connection, tableName?: string): Promise<boolean> {
+        if (!tableName) {
+            throw new Error('Table name is required');
+        }
+
+        try {
+            const [rows] = await connection.query<RowDataPacket[]>(
+                'SHOW TABLES LIKE ?', 
+                [tableName]
+            );
+            return rows.length > 0;
+        } catch (error) {
+            logger.error(`Error checking if table ${tableName} exists:`, error);
+            throw error;
+        }
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }

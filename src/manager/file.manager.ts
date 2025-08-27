@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import logger from "logging/logger.ts";
+import logger from "../logging/logger.ts";
 
 export const FileManager = {
   checkDirectory(directory_path: string) {
@@ -45,6 +45,33 @@ export const FileManager = {
       fs.writeFileSync(output_path, file_content);
     } catch (error) {
       throw new Error(`Error writing file ${output_path}: ${error}`);
+    }
+  },
+
+  removeFile(path: string) {
+    try {
+        fs.unlinkSync(path);
+        logger.info(`File removed: ${path}`);
+    } catch (err: any) {
+        if (err.code === "ENOENT") {
+            logger.warn(`File not found: ${path}`);
+        } else {
+            logger.error(`Error removing file: ${err.message}`);
+        }
+    }
+  },
+
+  /**
+   * Check if a file exists
+   * @param file_path - Path to the file to check
+   * @returns true if file exists, false otherwise
+   */
+  fileExists(file_path: string): boolean {
+    try {
+      return fs.existsSync(file_path) && fs.statSync(file_path).isFile();
+    } catch (error) {
+      logger.error(`Error checking file existence ${file_path}: ${error}`);
+      return false;
     }
   },
 };
