@@ -1,9 +1,8 @@
 import { pino } from 'pino';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { getPaths } from '../utils.ts';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { __dirname } = getPaths(import.meta.url);
 
 // Where to store logs
 const errorLogFilePath = path.join(__dirname, '..','..', 'logs', 'error.log');
