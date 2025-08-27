@@ -5,22 +5,21 @@ import type { Connection } from 'mysql2/promise';
 import type { MigrationRow } from "../interface/migration.row.interface.ts";
 import { FileManager } from "../manager/file.manager.ts";
 import path from "path";
-import { fileURLToPath } from "url";
 import { SchemaDumpService } from "./schema-dump.service.ts";
 import type { Config } from "interface/config.interface.ts";
 import type { FileConfig } from "interface/file-config.interface.ts";
 import type { DatabaseConfig } from "interface/database-config.interface.ts";
 import { runCommand } from "../helpers.ts";
-import { MIGRATION_HISTORY_TABLE, TEMP_PREFIX } from "../constants.ts";
+import { MIGRATION_HISTORY_TABLE, TEMP_PREFIX } from "../constants/constants.ts";
+import { getPaths } from "../utils.ts";
 
 export class MigrationService {
     private configManager: ConfigManager
     private databaseManager: DatabaseManager 
     private config: Config;
-
-    private __filename = fileURLToPath(import.meta.url);
-    private __dirname = path.dirname(this.__filename);
-
+    private __dirname: string;
+   
+    
     // Constants
     private static readonly MIGRATION_HISTORY_TABLE = MIGRATION_HISTORY_TABLE
     private static readonly TEMP_PREFIX = TEMP_PREFIX
@@ -29,6 +28,8 @@ export class MigrationService {
         this.databaseManager = databaseManager;    
         this.configManager = configManager;
         this.config = this.configManager.getConfig()
+        const { __dirname } = getPaths(import.meta.url);
+        this.__dirname = __dirname;
     }
 
     /**
