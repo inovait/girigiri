@@ -21,6 +21,25 @@ vi.mock("../../manager/file.manager.ts", () => ({
   },
 }));
 
+// mock constants
+vi.mock("../../constants/constants.ts", () => ({
+  MIGRATION_HISTORY_TABLE: "migration_history",
+  TEMP_PREFIX: "tmp",
+}));
+
+// mock error messages
+vi.mock("../../constants/error-messages.ts", () => ({
+  ERROR_MESSAGES: {
+    SCHEMA_DUMP: {
+      BULK: "Error while dumping schema",
+      TABLE: (table?: string) =>
+        table ? `Error while dumping table: ${table}` : "Error while dumping table",
+      STOP_DUE_TO_ERROR: "Stopping table dumping due to error",
+      FETCH_TABLES: "Error while fetching tables",
+    },
+  },
+}));
+
 // ---------------- imports after mocks ----------------
 import { SchemaDumpService } from "../../service/schema-dump.service.ts";
 import { runCommand } from "../../helpers.ts";
@@ -29,6 +48,8 @@ import { FileManager } from "../../manager/file.manager.ts";
 import { ConfigManager } from "../../manager/config.manager.ts";
 import { DatabaseManager } from "../../manager/database.manager.ts";
 import { Config } from "../../interface/config.interface.ts";
+import { MIGRATION_HISTORY_TABLE } from "../../constants/constants.ts";
+import { ERROR_MESSAGES } from "../../constants/error-messages.ts";
 
 // ---------------- Test Suite ----------------
 describe("SchemaDumpService", () => {
@@ -71,7 +92,7 @@ describe("SchemaDumpService", () => {
       expect(logger.info).toHaveBeenCalledWith("Schema succesfully dumped");
     });
 
-    it("should log error and rethrow if runCommand fails", async () => {
+    it("should log error using ERROR_MESSAGES and rethrow if runCommand fails", async () => {
       (runCommand as any).mockRejectedValueOnce(new Error("fail"));
 
       await expect(
@@ -79,7 +100,8 @@ describe("SchemaDumpService", () => {
       ).rejects.toThrow("fail");
 
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining("Error while dumping schema. Error:")
+        ERROR_MESSAGES.SCHEMA_DUMP.BULK,
+        expect.any(Error)
       );
     });
   });
@@ -102,7 +124,7 @@ describe("SchemaDumpService", () => {
       expect(logger.info).toHaveBeenCalledWith("Created directory: migrations");
     });
 
-    it("should throw if dumping a table fails", async () => {
+    it("should throw if dumping a table fails and log error using ERROR_MESSAGES", async () => {
       const fakeConn = {
         query: vi.fn().mockResolvedValue([[{ TABLE_NAME: "users" }]]),
         end: vi.fn(),
@@ -113,7 +135,22 @@ describe("SchemaDumpService", () => {
 
       await expect(schemaDumpService.dumpSchema()).rejects.toThrow("table dump fail");
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining("Stopping table dumping due to error:")
+        ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR,
+        expect.any(Error)
+      );
+    });
+
+    it("should log error using ERROR_MESSAGES when getTables fails", async () => {
+      const fakeConn = {
+        query: vi.fn().mockRejectedValue(new Error("connection fail")),
+        end: vi.fn(),
+      };
+      vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
+
+      await expect(schemaDumpService.dumpSchema()).rejects.toThrow("connection fail");
+      expect(logger.error).toHaveBeenCalledWith(
+        ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES,
+        expect.any(Error)
       );
     });
   });
@@ -131,20 +168,31 @@ describe("SchemaDumpService", () => {
       expect(logger.info).toHaveBeenCalledWith("Table succesfully dumped");
     });
 
-    it("should include data when dumping migration_history", async () => {
+    it("should include data when dumping migration_history using MIGRATION_HISTORY_TABLE constant", async () => {
       await schemaDumpService.dumpTable(
-        "migration_history",
+        MIGRATION_HISTORY_TABLE,
         fakeConfig.mainDatabaseConfig,
         fakeConfig.fileConfig
       );
 
       // - [0][0] -- access the first call of the mock, access the first argument of call
-      // - can check if the command string was build correctly without tirggering the
+      // - can check if the command string was build correctly without triggering the
       const cmd = (runCommand as any).mock.calls[0][0];
       expect(cmd).not.toContain("--no-data"); // should not contain --no-data
     });
 
-    it("should log error and throw if runCommand fails", async () => {
+    it("should include data when dumping hardcoded migration_history table name", async () => {
+      await schemaDumpService.dumpTable(
+        "migration_history", // hardcoded string for backward compatibility test
+        fakeConfig.mainDatabaseConfig,
+        fakeConfig.fileConfig
+      );
+
+      const cmd = (runCommand as any).mock.calls[0][0];
+      expect(cmd).not.toContain("--no-data");
+    });
+
+    it("should log error using ERROR_MESSAGES and throw if runCommand fails", async () => {
       (runCommand as any).mockRejectedValueOnce(new Error("bad table"));
 
       await expect(
@@ -152,8 +200,38 @@ describe("SchemaDumpService", () => {
       ).rejects.toThrow("bad table");
 
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining("Error while dumping table. Error:")
+        ERROR_MESSAGES.SCHEMA_DUMP.TABLE("users"),
+        expect.any(Error)
       );
+    });
+
+    it("should log generic table error message when table name is undefined", async () => {
+      (runCommand as any).mockRejectedValueOnce(new Error("bad table"));
+
+      // Simulate a scenario where table name might be undefined
+      const tableName = undefined as any;
+      await expect(
+        schemaDumpService.dumpTable(tableName, fakeConfig.mainDatabaseConfig, fakeConfig.fileConfig)
+      ).rejects.toThrow("bad table");
+
+      expect(logger.error).toHaveBeenCalledWith(
+        ERROR_MESSAGES.SCHEMA_DUMP.TABLE(tableName),
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe("Constants Integration", () => {
+    it("should use MIGRATION_HISTORY_TABLE constant correctly", () => {
+      expect(MIGRATION_HISTORY_TABLE).toBe("migration_history");
+    });
+
+    it("should use ERROR_MESSAGES constants correctly", () => {
+      expect(ERROR_MESSAGES.SCHEMA_DUMP.BULK).toBe("Error while dumping schema");
+      expect(ERROR_MESSAGES.SCHEMA_DUMP.TABLE("test_table")).toBe("Error while dumping table: test_table");
+      expect(ERROR_MESSAGES.SCHEMA_DUMP.TABLE()).toBe("Error while dumping table");
+      expect(ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR).toBe("Stopping table dumping due to error");
+      expect(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES).toBe("Error while fetching tables");
     });
   });
 });
