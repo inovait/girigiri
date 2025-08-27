@@ -50,7 +50,7 @@ export class SchemaDumpService {
     // first check if directory for outputing the migrations exists
     // create if it doesnt
     let outputDir: string = this.config.fileConfig.migrationsDir
-    if (FileManager.checkDirectory(outputDir)) {
+    if (!FileManager.checkDirectory(outputDir)) {
       FileManager.makeDirectory(outputDir)
       logger.info(`Created directory: ${outputDir}`);
     } else {
