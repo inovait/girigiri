@@ -1,5 +1,5 @@
 // __tests__/config.manager.test.ts
-import { describe, it, beforeEach, expect, vi } from "vitest";
+import { describe, it, beforeEach, expect, vi, afterEach } from "vitest";
 import { ConfigManager } from "../../manager/config.manager.ts";
 import type { Config } from "../../interface/config.interface.ts";
 
