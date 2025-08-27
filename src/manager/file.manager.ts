@@ -6,12 +6,12 @@ export const FileManager = {
     try {
       if (!fs.existsSync(directory_path)) {
         logger.info(`Directory: ${directory_path} does not exist`)
-        // directory does not exist, could log here
         return false;
       }
       return true;
     } catch (error) {
-      // log error
+      
+      logger.error(`Error while checking directory ${directory_path}: ${error}`)
       throw new Error(`Error checking directory ${directory_path}: ${error}`);
     }
   },
