@@ -11,6 +11,7 @@ import type { FileConfig } from "interface/file-config.interface.ts";
 import type { DatabaseConfig } from "interface/database-config.interface.ts";
 import { runCommand } from "../helpers.ts";
 import { MIGRATION_HISTORY_TABLE, TEMP_PREFIX } from "../constants/constants.ts";
+import { ERROR_MESSAGES } from "../constants/error-messages.ts";
 import { getPaths } from "../utils.ts";
 
 export class MigrationService {
@@ -75,7 +76,7 @@ export class MigrationService {
             logger.info('Migration validation completed successfully');
             
         } catch (error) {
-            logger.error('Error while validating migrations:', error);
+            logger.error(ERROR_MESSAGES.MIGRATION.VALIDATION, error);
             throw error;
         } finally {
             // cleanup connections and resources
@@ -179,6 +180,9 @@ export class MigrationService {
         try {
             logger.info(`Creating temporary database: ${databaseConfig.database}`);
             await this.databaseManager.createDatabase(connection, databaseConfig.database!);
+        } catch (error) {
+            logger.error(ERROR_MESSAGES.DATABASE.CREATE, error);
+            throw error;
         } finally {
             await connection.end();
         }
@@ -221,7 +225,7 @@ export class MigrationService {
             }
             
         } catch (error) {
-            logger.error('Failed to restore migration history data:', error);
+            logger.error(ERROR_MESSAGES.MIGRATION.RESTORE_HISTORY, error);
             throw error;
         }
     }
@@ -265,6 +269,9 @@ export class MigrationService {
         try {
             connection = await this.databaseManager.connect(this.config.migrationDatabaseConfig);
             return await this.databaseManager.tableExists(connection, MigrationService.MIGRATION_HISTORY_TABLE);
+        } catch (error) {
+            logger.error(ERROR_MESSAGES.TABLE.EXISTS(MigrationService.MIGRATION_HISTORY_TABLE), error);
+            throw error;
         } finally {
             if (connection) await connection.end();
         }
@@ -312,7 +319,7 @@ export class MigrationService {
             await runCommand(cmd, databaseConfig.password);
             logger.info('SQL file executed successfully');
         } catch (error) {
-            logger.error(`Failed to execute SQL file: ${file}`, error);
+            logger.error(ERROR_MESSAGES.MIGRATION.EXECUTE_SQL(file), error);
             throw error;
         }
     }
@@ -335,6 +342,9 @@ export class MigrationService {
         if (tmpMainConnection) {
             cleanupPromises.push(
                 this.databaseManager.dropDatabase(tmpMainConnection, tmpMainConfig.database!)
+                    .catch(error => {
+                        logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
+                    })
                     .finally(() => tmpMainConnection?.end())
             );
         }
@@ -342,6 +352,9 @@ export class MigrationService {
         if (tmpMigConnection && tmpMigConnection !== tmpMainConnection) {
             cleanupPromises.push(
                 this.databaseManager.dropDatabase(tmpMigConnection, tmpMigConfig.database!)
+                    .catch(error => {
+                        logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
+                    })
                     .finally(() => tmpMigConnection?.end())
             );
         }
@@ -357,7 +370,7 @@ export class MigrationService {
                     logger.info(`Removed temporary file: ${file}`);
                 }
             } catch (error) {
-                logger.warn(`Failed to remove temporary file ${file}:`, error);
+                logger.warn(ERROR_MESSAGES.MIGRATION.CLEANUP_FILE(file), error);
             }
         }
         
@@ -413,7 +426,7 @@ export class MigrationService {
             }
             
         } catch(error: any) {
-            logger.error(`Error while migrating database: ${error}`)
+            logger.error(ERROR_MESSAGES.MIGRATION.MIGRATE(error.message || error.toString()));
             throw error;
         } finally {
             // only close if we created the connections
@@ -438,7 +451,7 @@ export class MigrationService {
             );
             return rows;
         } catch (error) {
-            logger.error("Error fetching applied migrations:", error);
+            logger.error(ERROR_MESSAGES.MIGRATION.FETCH_APPLIED, error);
             throw error;
         }
     }
@@ -473,13 +486,13 @@ export class MigrationService {
             
             logger.info(`Applied migration successfully: ${fileName}`)
         } catch (err: any) {
-            logger.error(`Failed migration: ${fileName}. Rolling back changes`)
+            logger.error(ERROR_MESSAGES.MIGRATION.FAILED_MIGRATION(fileName))
             
             try {
                 await mainConnection.rollback();
                 await migrationHistoryConnection.rollback();
             } catch (rollbackError) {
-                logger.error('Error during rollback:', rollbackError);
+                logger.error(ERROR_MESSAGES.MIGRATION.ROLLBACK, rollbackError);
                 throw rollbackError;
             }
             
@@ -496,7 +509,7 @@ export class MigrationService {
         const initSqlPath = path.join(this.__dirname, '..','..', 'database', 'init_migrations.sql');
         
         if (!FileManager.fileExists || !FileManager.fileExists(initSqlPath)) {
-            throw new Error(`Missing migration init file at: ${initSqlPath}`);
+            throw new Error(ERROR_MESSAGES.MIGRATION.INIT_FILE_MISSING(initSqlPath));
         }
         
         const createTable = FileManager.readFile(initSqlPath)
