@@ -18,11 +18,28 @@ export class SchemaDumpService {
     this.config = configManager.getConfig();
   }
 
-  async dumpSchemaBulk(outputDir: string) {
-    if (FileManager.checkDirectory(outputDir)) {
-      FileManager.makeDirectory(outputDir)
-    } else {
+  async dumpSchemaBulk(databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
+    let args = [
+      `-u${databaseConfig.user}`,
+      `-h${databaseConfig.host}`,
+      `-P${databaseConfig.port}`,
+      "--no-data",
+      "--single-transaction",
+      "--routines",
+      "--triggers",
+      "--events",
+      databaseConfig.database,
+    ];
 
+    let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
+    const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/tmp_dump.sql`;
+
+    try {
+      await runCommand(dumpCommand, this.config.mainDatabaseConfig.password)
+      logger.info('Schema succesfully dumped')
+    } catch (err) {
+      logger.error(`Error while dumping schema. Error: ${err}`)
+      throw err
     }
   }
 
@@ -68,7 +85,7 @@ export class SchemaDumpService {
     }
   }
 
-  private async dumpTable(table: string, config: DatabaseConfig, fileConfig: FileConfig) {
+  public async dumpTable(table: string, config: DatabaseConfig, fileConfig: FileConfig) {
     let args = [
       `-u ${config.user}`,
       `-h ${config.host}`,
@@ -84,7 +101,6 @@ export class SchemaDumpService {
     }
 
     let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
-    //const sedCmd = ` | sed -E 's/ (ENGINE|AUTO_INCREMENT|DEFAULT CHARSET|COLLATE)=[^ ]+//g'`;
     const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/${table}.sql`;
 
     try {
