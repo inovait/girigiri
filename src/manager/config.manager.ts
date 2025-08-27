@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import type { Config } from "../interface/config.interface.ts";
 import type { DatabaseConfig } from "../interface/database-config.interface.ts";
 import type { FileConfig } from "../interface/file-config.interface.ts";
+import { ERROR_MESSAGES } from "../constants/error-messages.ts";
 
 dotenv.config();
 
@@ -52,11 +53,15 @@ export class ConfigManager {
     }
 
     private loadConfiguration(): Config {
-        return {
-            migrationDatabaseConfig: this.createMigrationDatabaseConfig(),
-            mainDatabaseConfig: this.createMainDatabaseConfig(),
-            fileConfig: this.createFileConfig(),
-        };
+        try {
+            return {
+                migrationDatabaseConfig: this.createMigrationDatabaseConfig(),
+                mainDatabaseConfig: this.createMainDatabaseConfig(),
+                fileConfig: this.createFileConfig(),
+            };
+        } catch (error) {
+            throw new Error(ERROR_MESSAGES.CONFIG.LOAD);
+        }
     }
 
     private createMigrationDatabaseConfig(): DatabaseConfig {
@@ -69,7 +74,7 @@ export class ConfigManager {
             waitForConnections: true,
             multipleStatements: true,
             connectionLimit: 10,
-            queueLimit: 0 // Fixed typo: queveLimit -> queueLimit
+            queueLimit: 0 
         };
     }
 

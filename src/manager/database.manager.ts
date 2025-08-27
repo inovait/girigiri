@@ -1,6 +1,7 @@
 import { createConnection } from 'mysql2/promise';
 import type { Connection, RowDataPacket } from 'mysql2/promise';
 import type { DatabaseConfig } from '../interface/database-config.interface.ts';
+import { ERROR_MESSAGES } from '../constants/error-messages.ts';
 import logger from '../logging/logger.ts';
 
 export class DatabaseManager {
@@ -27,7 +28,7 @@ export class DatabaseManager {
                 retries++;
                 
                 if (retries >= maxRetries) {
-                    logger.error('Exceeded maximum retry count for connecting to the database');
+                    logger.error(ERROR_MESSAGES.DATABASE.CONNECTION_MAX_RETRIES);
                     throw error;
                 }
 
@@ -36,13 +37,13 @@ export class DatabaseManager {
             }
         }
 
-        throw new Error('Unexpected error connecting to the database');
+        throw new Error(ERROR_MESSAGES.DATABASE.CONNECTION_UNEXPECTED);
     }
 
     async createDatabase(connection: Connection, dbName?: string): Promise<void> {
         if (!dbName) {
-            logger.error('Database name is required');
-            throw new Error('Database name is required');
+            logger.error(ERROR_MESSAGES.DATABASE.NAME_REQUIRED);
+            throw new Error(ERROR_MESSAGES.DATABASE.NAME_REQUIRED);
         }
 
         try {
@@ -50,7 +51,7 @@ export class DatabaseManager {
             await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
             logger.info(`Database ${dbName} created successfully`);
         } catch (error) {
-            logger.error('Error creating database:', error);
+            logger.error(ERROR_MESSAGES.DATABASE.CREATE, error);
             throw error;
         }
     }
@@ -62,8 +63,8 @@ export class DatabaseManager {
      */
     async dropDatabase(connection: Connection, dbName?: string): Promise<void> {
         if (!dbName) {
-            logger.error('Database name is required');
-            throw new Error('Database name is required');
+            logger.error(ERROR_MESSAGES.DATABASE.NAME_REQUIRED);
+            throw new Error(ERROR_MESSAGES.DATABASE.NAME_REQUIRED);
         }
 
         try {
@@ -71,7 +72,7 @@ export class DatabaseManager {
             await connection.query(`DROP DATABASE \`${dbName}\``);
             logger.info(`Database ${dbName} dropped successfully`);
         } catch (error) {
-            logger.error('Error dropping database:', error);
+            logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
             throw error;
         }
     }
@@ -84,7 +85,7 @@ export class DatabaseManager {
      */
     async tableExists(connection: Connection, tableName?: string): Promise<boolean> {
         if (!tableName) {
-            throw new Error('Table name is required');
+            throw new Error(ERROR_MESSAGES.TABLE.NAME_REQUIRED);
         }
 
         try {
@@ -94,7 +95,7 @@ export class DatabaseManager {
             );
             return rows.length > 0;
         } catch (error) {
-            logger.error(`Error checking if table ${tableName} exists:`, error);
+            logger.error(ERROR_MESSAGES.TABLE.EXISTS(tableName), error);
             throw error;
         }
     }
