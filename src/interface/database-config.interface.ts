@@ -3,9 +3,9 @@ export interface DatabaseConfig {
   port: number;
   user: string;
   password: string;
-  database: string;
+  database?: string;
   waitForConnections: boolean;
   multipleStatements: boolean;
-  connectionLimits: number
-  queveLimit: number
+  connectionLimit: number
+  queueLimit: number
 }
