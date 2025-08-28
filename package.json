@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dump:schema": "tsx src/main.ts dump:schema",
-    "check:migrations": "tsx src/main.ts  check:migrations",
+    "check:migrations": "bash ./scripts/docker_reset.sh && tsx src/main.ts  check:migrations",
     "migrate": "tsx src/main.ts migrate",
     "test": "vitest --reporter verbose"
   },

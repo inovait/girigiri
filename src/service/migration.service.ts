@@ -57,10 +57,10 @@ export class MigrationService {
             await this.createSchemaDumps(tmpFileConfig, tempFiles);
             
             // 2. Create and setup temporary databases
-            await this.setupTemporaryDatabases(tmpMainConfig, tmpMigConfig, tmpFileConfig, tempFiles);
+            await this.setupTemporaryDatabases(tmpMigConfig, tmpMigConfig, tmpFileConfig, tempFiles);
             
             // 3. Connect to temporary databases
-            tmpMainConnection = await this.databaseManager.connect(tmpMainConfig);
+            tmpMainConnection = await this.databaseManager.connect(tmpMigConfig);
             tmpMigConnection = await this.databaseManager.connect(tmpMigConfig);
             
             // 4. Run migrations on temporary databases
@@ -101,7 +101,7 @@ export class MigrationService {
             logger.info('Dumping migration history with data...');
             await schemaDumpService.dumpTable(
                 MigrationService.MIGRATION_HISTORY_TABLE, 
-                this.config.migrationDatabaseConfig, 
+                this.config.mainDatabaseConfig, 
                 tmpFileConfig
             );
             tempFiles.push(`${tmpFileConfig.schemaOutputDir}/${MigrationService.MIGRATION_HISTORY_TABLE}.sql`);
@@ -267,7 +267,7 @@ export class MigrationService {
     private async checkMigrationHistoryExists(): Promise<boolean> {
         let connection: Connection | null = null;
         try {
-            connection = await this.databaseManager.connect(this.config.migrationDatabaseConfig);
+            connection = await this.databaseManager.connect(this.config.mainDatabaseConfig);
             return await this.databaseManager.tableExists(connection, MigrationService.MIGRATION_HISTORY_TABLE);
         } catch (error) {
             logger.error(ERROR_MESSAGES.TABLE.EXISTS(MigrationService.MIGRATION_HISTORY_TABLE), error);
@@ -414,16 +414,6 @@ export class MigrationService {
                 const filePath = path.join(config.fileConfig.migrationsDir, migrationFile)
                 await this.applyMigration(mainConnection, migrationHistoryConnection, filePath, migrationFile)
             }
-
-            // only close connections if we created them (not passed in)
-            if (!_mainConnection) {
-                logger.info('Closing main database connection')
-                await mainConnection.end()
-            }
-            if (!_migrationHistoryConnection) {
-                logger.info('Closing migration history database connection')
-                await migrationHistoryConnection.end()
-            }
             
         } catch(error: any) {
             logger.error(ERROR_MESSAGES.MIGRATION.MIGRATE(error.message || error.toString()));
@@ -431,9 +421,11 @@ export class MigrationService {
         } finally {
             // only close if we created the connections
             if (!_mainConnection) {
+                logger.info('Closing main database connection')
                 await mainConnection?.end();
             }
             if (!_migrationHistoryConnection) {
+                logger.info('Closing migration history database connection')
                 await migrationHistoryConnection?.end()
             }
         }

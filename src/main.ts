@@ -15,8 +15,11 @@ program
       const configManager = ConfigManager.getInstance();
       const databaseManager = new DatabaseManager();
       const migrationService = new MigrationService(configManager, databaseManager);
+      
+      let connection1 = await databaseManager.connect(configManager.getConfig().mainDatabaseConfig)
+      let connection2 = await databaseManager.connect(configManager.getConfig().mainDatabaseConfig)
 
-      await migrationService.migrate();
+      await migrationService.migrate(connection1, connection2);
       console.log("Migrations completed successfully");
     } catch (err) {
       console.error("Migration failed:", err);
@@ -49,6 +52,11 @@ program
       const configManager = ConfigManager.getInstance();
       const databaseManager = new DatabaseManager();
       const migrationService = new MigrationService(configManager, databaseManager);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // ali zelis da se baza na konc dropne
+      // ali zelis da se migracije izvajajo na tmp ali na main bazi
+
 
       await migrationService.checkMigrations();
       console.log("Migration check completed successfully");

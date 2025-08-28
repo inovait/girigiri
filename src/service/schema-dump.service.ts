@@ -112,7 +112,7 @@ export class SchemaDumpService {
 
     try {
       logger.info(`Dumping table: ${table}`)
-      await runCommand(dumpCommand, this.config.mainDatabaseConfig.password)
+      await runCommand(dumpCommand,config.password)
       logger.info('Table succesfully dumped')
     } catch (err) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.TABLE(table), err);
