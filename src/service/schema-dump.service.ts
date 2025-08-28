@@ -33,6 +33,12 @@ export class SchemaDumpService {
     ];
 
     let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
+    // ensure directory exists
+    if (!FileManager.checkDirectory(fileConfig.schemaOutputDir)) {
+      logger.info("creating directory")
+      FileManager.makeDirectory(fileConfig.schemaOutputDir);
+    }
+
     const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/tmp_dump.sql`;
 
     try {

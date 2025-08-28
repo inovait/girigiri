@@ -42,8 +42,8 @@ export class MigrationService {
         const tmpMainConfig = this.createTempDatabaseConfig(this.config.mainDatabaseConfig);
         const tmpMigConfig = this.createTempDatabaseConfig(this.config.migrationDatabaseConfig);
         const tmpFileConfig: FileConfig = {
-            migrationsDir: 'src/tests/integration/fixtures', 
-            schemaOutputDir: 'src/tests/integration/fixtures'
+            migrationsDir: 'src/tmp', 
+            schemaOutputDir: 'src/tmp'
         };
 
         let tmpMainConnection: Connection | null = null;
