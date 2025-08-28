@@ -1,1 +1,0 @@
-ALTER TABLE integration_test_tab ADD COLUMN created_at DATE;
