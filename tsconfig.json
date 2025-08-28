@@ -2,51 +2,13 @@
   "include": ["src/**/*"],
   "exclude": ["**/*.spec.ts", "**/*.test.ts"],
   "compilerOptions": {
-    // File Layout
-    "rootDir": "src",
-    "outDir": "./dist",
-
-    // Environment Settings
+    "baseUrl": "./src",
     "module": "nodenext",
-    "target": "ES2020",
+    "target": "es2020",
     "moduleResolution": "nodenext",
-
-    // For nodejs:
-    "lib": ["esnext"],
-    "types": ["node", "express", "dotenv", "jest"],
-    "typeRoots": ["./node_modules/@types"],
-    
-    // Output Options
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-
-    // Stricter Typechecking
+    "esModuleInterop": true,
     "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // Style Options (recommend enabling)
-    "noImplicitReturns": true,
-    "noImplicitOverride": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "allowImportingTsExtensions": false,
-
-    // Module Options
-    "jsx": "react-jsx",
-    "verbatimModuleSyntax": false,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-
-    // Decorator Support
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "emitDeclarationOnly": false,
-    "esModuleInterop": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   }
 }
