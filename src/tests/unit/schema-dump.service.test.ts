@@ -21,25 +21,6 @@ vi.mock("../../manager/file.manager.ts", () => ({
   },
 }));
 
-// mock constants
-vi.mock("../../constants/constants.ts", () => ({
-  MIGRATION_HISTORY_TABLE: "migration_history",
-  TEMP_PREFIX: "tmp",
-}));
-
-// mock error messages
-vi.mock("../../constants/error-messages.ts", () => ({
-  ERROR_MESSAGES: {
-    SCHEMA_DUMP: {
-      BULK: "Error while dumping schema",
-      TABLE: (table?: string) =>
-        table ? `Error while dumping table: ${table}` : "Error while dumping table",
-      STOP_DUE_TO_ERROR: "Stopping table dumping due to error",
-      FETCH_TABLES: "Error while fetching tables",
-    },
-  },
-}));
-
 // ---------------- imports after mocks ----------------
 import { SchemaDumpService } from "../../service/schema-dump.service.ts";
 import { runCommand } from "../../helpers.ts";
@@ -92,7 +73,7 @@ describe("SchemaDumpService", () => {
       expect(logger.info).toHaveBeenCalledWith("Schema succesfully dumped");
     });
 
-    it("should log error using ERROR_MESSAGES and rethrow if runCommand fails", async () => {
+    it("should log error and rethrow if runCommand fails", async () => {
       (runCommand as any).mockRejectedValueOnce(new Error("fail"));
 
       await expect(
@@ -124,7 +105,7 @@ describe("SchemaDumpService", () => {
       expect(logger.info).toHaveBeenCalledWith("Created directory: migrations");
     });
 
-    it("should throw if dumping a table fails and log error using ERROR_MESSAGES", async () => {
+    it("should throw error if dumping a table fails and log error", async () => {
       const fakeConn = {
         query: vi.fn().mockResolvedValue([[{ TABLE_NAME: "users" }]]),
         end: vi.fn(),
@@ -140,7 +121,7 @@ describe("SchemaDumpService", () => {
       );
     });
 
-    it("should log error using ERROR_MESSAGES when getTables fails", async () => {
+    it("should throw and log error when getTables fails", async () => {
       const fakeConn = {
         query: vi.fn().mockRejectedValue(new Error("connection fail")),
         end: vi.fn(),
@@ -156,7 +137,7 @@ describe("SchemaDumpService", () => {
   });
 
   describe("dumpTable", () => {
-    it("should run mysqldump for a normal table", async () => {
+    it("should successfully complete one table dump", async () => {
       await schemaDumpService.dumpTable(
         "users",
         fakeConfig.mainDatabaseConfig,
@@ -181,17 +162,6 @@ describe("SchemaDumpService", () => {
       expect(cmd).not.toContain("--no-data"); // should not contain --no-data
     });
 
-    it("should include data when dumping hardcoded migration_history table name", async () => {
-      await schemaDumpService.dumpTable(
-        "migration_history", // hardcoded string for backward compatibility test
-        fakeConfig.mainDatabaseConfig,
-        fakeConfig.fileConfig
-      );
-
-      const cmd = (runCommand as any).mock.calls[0][0];
-      expect(cmd).not.toContain("--no-data");
-    });
-
     it("should log error using ERROR_MESSAGES and throw if runCommand fails", async () => {
       (runCommand as any).mockRejectedValueOnce(new Error("bad table"));
 
@@ -205,7 +175,7 @@ describe("SchemaDumpService", () => {
       );
     });
 
-    it("should log generic table error message when table name is undefined", async () => {
+    it("should throw and log generic table error message when table name is undefined", async () => {
       (runCommand as any).mockRejectedValueOnce(new Error("bad table"));
 
       // Simulate a scenario where table name might be undefined

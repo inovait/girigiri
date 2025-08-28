@@ -108,7 +108,7 @@ describe("MigrationService - checkMigrations", () => {
         });
 
         it("should run checkMigrations succesfully", async () => {
-            await migrationService.checkMigrations();
+            await expect(migrationService.checkMigrations()).resolves.toBeUndefined(); // check if no error is thrown
 
             // Verify logger calls ( check if succesfully migrated and if validation was completed succesfully)
             expect(logger.info).toHaveBeenCalledWith("Starting migration validation...");
@@ -126,8 +126,11 @@ describe("MigrationService - checkMigrations", () => {
             expect(FileManager.readDirectory).toHaveBeenCalled();
             expect(FileManager.fileExists).toHaveBeenCalled();
 
-            // Verify SchemaDumpService was instantiated
-            expect((SchemaDumpService as unknown as Mock).mock.instances.length).toBeGreaterThan(0);
+            // Verify SchemaDumpService was instantiated and no error was thrown
+            expect(() => {
+                expect((SchemaDumpService as unknown as Mock).mock.instances.length).toBeGreaterThan(0);
+            }).not.toThrow();
+
         });
     });
 
@@ -152,8 +155,8 @@ describe("MigrationService - checkMigrations", () => {
             migrationService = new MigrationService(configManager, databaseManager);
         });
 
-        it("should throw an error if a migration fails", async () => {
-            await expect(migrationService.checkMigrations()).rejects.toThrow("Migration failed");
+        it("should throw and log an error if a migration fails", async () => {
+            await expect(migrationService.checkMigrations()).rejects.toThrow("Migration failed"); // check error was thrown
 
             const conn = await databaseManager.connect({} as DatabaseConfig);
             expect(conn.rollback).toHaveBeenCalled();
@@ -205,7 +208,7 @@ describe("MigrationService - migrate", () => {
         );
     });
 
-    it("should rollback and log error if migration fails (negative)", async () => {
+    it("should rollback, throw and log error if migration fails (negative)", async () => {
         const fakeConn = {
             query: vi.fn().mockRejectedValue(new Error("Migration failed")),
             execute: vi.fn().mockResolvedValue([[]]),
@@ -217,7 +220,7 @@ describe("MigrationService - migrate", () => {
 
         vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
 
-        await expect(migrationService.migrate()).rejects.toThrow("Migration failed");
+        await expect(migrationService.migrate()).rejects.toThrow("Migration failed"); // to throw error
 
         expect(fakeConn.rollback).toHaveBeenCalled();
         expect(logger.error).toHaveBeenCalledWith(

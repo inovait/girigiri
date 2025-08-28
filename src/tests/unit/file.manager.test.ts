@@ -10,18 +10,6 @@ import { describe, it, expect, beforeEach, vi, Mock } from "vitest";
 vi.mock("fs");
 vi.mock("../../logging/logger");
 
-// Mock error messages
-vi.mock("../../constants/error-messages", () => ({
-  ERROR_MESSAGES: {
-    FILE: {
-      PATH_REQUIRED: "File path is required",
-      READ: "Error reading file",
-      WRITE: "Error writing file",
-      DELETE: "Error deleting file",
-    },
-  },
-}));
-
 describe("FileManager", () => {
   const mockDir = "/mock/dir";
   const mockFile = "/mock/dir/file.txt";
@@ -88,11 +76,11 @@ describe("FileManager", () => {
       );
     });
 
-    it("should throw ERROR_MESSAGES.FILE.PATH_REQUIRED when path is empty", () => {
+    it("should throw error when path is empty", () => {
       expect(() => FileManager.makeDirectory("")).toThrow(ERROR_MESSAGES.FILE.PATH_REQUIRED);
     });
 
-    it("should throw ERROR_MESSAGES.FILE.PATH_REQUIRED when path is null/undefined", () => {
+    it("should throw error when path is null/undefined", () => {
       expect(() => FileManager.makeDirectory(null as any)).toThrow(ERROR_MESSAGES.FILE.PATH_REQUIRED);
       expect(() => FileManager.makeDirectory(undefined as any)).toThrow(ERROR_MESSAGES.FILE.PATH_REQUIRED);
     });
@@ -118,11 +106,11 @@ describe("FileManager", () => {
       );
     });
 
-    it("should throw ERROR_MESSAGES.FILE.PATH_REQUIRED when path is empty", () => {
+    it("should throw error when path is empty", () => {
       expect(() => FileManager.readDirectory("")).toThrow(ERROR_MESSAGES.FILE.PATH_REQUIRED);
     });
 
-    it("should throw ERROR_MESSAGES.FILE.PATH_REQUIRED when path is null/undefined", () => {
+    it("should throw error when path is null/undefined", () => {
       expect(() => FileManager.readDirectory(null as any)).toThrow(ERROR_MESSAGES.FILE.PATH_REQUIRED);
       expect(() => FileManager.readDirectory(undefined as any)).toThrow(ERROR_MESSAGES.FILE.PATH_REQUIRED);
     });
@@ -205,11 +193,11 @@ describe("FileManager", () => {
       expect(logger.warn).toHaveBeenCalledWith(`File not found: ${mockFile}`);
     });
 
-    it("should log error using ERROR_MESSAGES on other errors", () => {
+    it("should log error on other errors", () => {
       const err: any = new Error("Other error");
       (fs.unlinkSync as unknown as Mock).mockImplementation(() => {
         throw err;
-      });
+      }); 
       FileManager.removeFile(mockFile);
       expect(logger.error).toHaveBeenCalledWith(
         ERROR_MESSAGES.FILE.DELETE,
