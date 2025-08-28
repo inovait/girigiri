@@ -6,15 +6,9 @@
   "type": "module",
   "scripts": {
     "dump:schema": "npx ts-node-esm src/main.ts dump:schema",
-    "check:migrations": " npx ts-node-esm src/main.ts check:migrations",
+    "check:migrations": "npx ts-node-esm src/main.ts check:migrations",
     "migrate": "npx ts-node-esm src/main.ts migrate",
-    "test": "vitest --reporter verbose",
-    "build": "tsc",
-    "docker:init-mig-database": "bash ./scripts/init_migration_database.sh",
-    "docker:start": "docker compose --env-file .env up -d --build",
-    "docker:reset": "bash ./scripts/docker_reset.sh",
-    "docker:enter": "docker exec -it node-app /bin/sh",
-    "docker:migrate": "docker run node-app node dist/migrate.js"
+    "test": "vitest --reporter verbose"
   },
   "repository": {
     "type": "git",
