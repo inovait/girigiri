@@ -8,7 +8,7 @@ export class DatabaseManager {
     private static readonly DEFAULT_MAX_RETRIES = 5;
     private static readonly DEFAULT_RETRY_DELAY_MS = 5000;
 
-    constructor() {}
+    constructor() { }
 
     async connect(databaseConfig: DatabaseConfig): Promise<Connection> {
         const maxRetries = DatabaseManager.DEFAULT_MAX_RETRIES;
@@ -22,11 +22,11 @@ export class DatabaseManager {
                 } else {
                     logger.info(`Connecting to database. Retry #${retries}`);
                 }
-                
+
                 return await createConnection(databaseConfig);
             } catch (error: any) {
                 retries++;
-                
+
                 if (retries >= maxRetries) {
                     logger.error(ERROR_MESSAGES.DATABASE.CONNECTION_MAX_RETRIES);
                     throw error;
@@ -90,7 +90,7 @@ export class DatabaseManager {
 
         try {
             const [rows] = await connection.query<RowDataPacket[]>(
-                'SHOW TABLES LIKE ?', 
+                'SHOW TABLES LIKE ?',
                 [tableName]
             );
             return rows.length > 0;
