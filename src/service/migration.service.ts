@@ -9,173 +9,141 @@ import { SchemaDumpService } from "./schema-dump.service.ts";
 import type { Config } from "interface/config.interface.ts";
 import type { FileConfig } from "interface/file-config.interface.ts";
 import type { DatabaseConfig } from "interface/database-config.interface.ts";
-import { runCommand } from "../helpers.ts";
-import { MIGRATION_HISTORY_TABLE, TEMP_PREFIX } from "../constants/constants.ts";
+import { runCommand } from "../utils.ts";
+import { DOCKER_DOWN_COMMAND, DOCKER_UP_COMMAND, MIGRATION_HISTORY_TABLE, TEMP_PREFIX } from "../constants/constants.ts";
 import { ERROR_MESSAGES } from "../constants/error-messages.ts";
 import { getPaths } from "../utils.ts";
 
-export class MigrationService {
-    private configManager: ConfigManager
-    private databaseManager: DatabaseManager 
-    private config: Config;
-    private __dirname: string;
-   
-    
-    // Constants
-    private static readonly MIGRATION_HISTORY_TABLE = MIGRATION_HISTORY_TABLE
-    private static readonly TEMP_PREFIX = TEMP_PREFIX
+interface MigrationResult {
+    unappliedMigrations: Set<string>;
+    appliedMigrations: Set<string>;
+}
 
-    constructor(configManager: ConfigManager, databaseManager: DatabaseManager ) {
-        this.databaseManager = databaseManager;    
+export class MigrationService {
+    private readonly configManager: ConfigManager;
+    private readonly databaseManager: DatabaseManager;
+    private readonly config: Config;
+    private readonly __dirname: string;
+
+    constructor(configManager: ConfigManager, databaseManager: DatabaseManager) {
         this.configManager = configManager;
-        this.config = this.configManager.getConfig()
+        this.databaseManager = databaseManager;
+        this.config = this.configManager.getConfig();
         const { __dirname } = getPaths(import.meta.url);
         this.__dirname = __dirname;
     }
 
     /**
-     * Validate if migration succeeds on a temporary database
-     * Creates temp databases, restores schema, runs migrations, dumps result, cleans up
+     * Validates if migrations succeed on a temporary database
+     * Creates temp database, restores schema, runs migrations, dumps result, cleans up
      */
-    async checkMigrations(): Promise<void> {   
-        // create temporary configurations
-        const tmpMainConfig = this.createTempDatabaseConfig(this.config.mainDatabaseConfig);
-        const tmpMigConfig = this.createTempDatabaseConfig(this.config.migrationDatabaseConfig);
-        const tmpFileConfig: FileConfig = {
-            migrationsDir: 'src/tmp', 
-            schemaOutputDir: 'src/tmp'
-        };
-
-        let tmpMainConnection: Connection | null = null;
-        let tmpMigConnection: Connection | null = null;
-        const tempFiles: string[] = [];
+    async checkMigrations(): Promise<void> {
+        let mainConnection: Connection | null = null;
+        let tempConnection: Connection | null = null;
+        let config = this.config;
 
         try {
-            logger.info('Starting migration validation...');
-            
-            // 1. Create schema dumps
-            await this.createSchemaDumps(tmpFileConfig, tempFiles);
-            
-            // 2. Create and setup temporary databases
-            await this.setupTemporaryDatabases(tmpMigConfig, tmpMigConfig, tmpFileConfig, tempFiles);
-            
-            // 3. Connect to temporary databases
-            tmpMainConnection = await this.databaseManager.connect(tmpMigConfig);
-            tmpMigConnection = await this.databaseManager.connect(tmpMigConfig);
-            
-            // 4. Run migrations on temporary databases
-            logger.info('Running migrations on temporary database...');
-            await this.migrate(tmpMainConnection, tmpMigConnection);
-            
-            // 5. Dump the migrated schema for comparison
-            logger.info('Dumping migrated schema...');
-            const schemaDumpService = new SchemaDumpService(this.configManager, this.databaseManager);
-            await schemaDumpService.dumpSchemaBulk(tmpMainConfig, tmpFileConfig);
-            tempFiles.push(`${tmpFileConfig.schemaOutputDir}/tmp_dump.sql`);
-            
-            logger.info('Migration validation completed successfully');
-            
+            // connects to the main database
+            mainConnection = await this.databaseManager.connect(config.mainDatabaseConfig);
+            let migHistoryExists: boolean = await this.checkMigrationHistoryExists(mainConnection);
+
+            // checks if migration history table exists on main database nad dumps it with data
+            const migrationHistoryDumpPath = await this.handleMigrationHistory(mainConnection, config);
+
+            // if the migration history exists on the main database, it retrieves the applied and unapplied migrations
+            let migrationResult;
+            if (migHistoryExists) {
+                migrationResult = await this.getUnappliedAndAppliedMigrations(mainConnection);
+                // if there are no unapplied migrations, the flow ends
+                if (migrationResult.unappliedMigrations.size < 0) {
+                    logger.info("No unapplied migrations. Exiting")
+                    return
+                }
+            }
+
+            logger.info("Unapplied migrations found. Setting up temporary database...");
+            logger.info('Winding up docker service')
+            await runCommand(DOCKER_UP_COMMAND)
+            // dumps the whole main database WITHOUT data
+            const schemaDumpPath = await this.dumpSchema(config.mainDatabaseConfig, config.fileConfig)
+            // sets up a temp database
+            await this.setupTemporaryDatabase(schemaDumpPath, migrationHistoryDumpPath);
+
+            // connects to the temp database
+            tempConnection = await this.databaseManager.connect(config.migrationDatabaseConfig);
+            // triggers the migration on the temp database
+            await this.migrate(tempConnection, config.migrationDatabaseConfig, config.fileConfig);
+            // dumps the tmp database schema
+            await this.dumpSchemaTableByTable(config.migrationDatabaseConfig, config.fileConfig);
+            logger.info('Check migrations completed successfully');
+
         } catch (error) {
             logger.error(ERROR_MESSAGES.MIGRATION.VALIDATION, error);
             throw error;
         } finally {
-            // cleanup connections and resources
-            await this.cleanup(tmpMainConnection, tmpMigConnection, tmpMainConfig, tmpMigConfig, tempFiles);
+            //await this.dumpSchemaByTable(config.migrationDatabaseConfig, config.fileConfig)
+            await this.cleanup(/*tempConnection, this.config.migrationDatabaseConfig*/);
         }
     }
 
     /**
-     * Create schema dumps from source databases
+     * Handles migration history table existence and dumping
      */
-    private async createSchemaDumps(tmpFileConfig: FileConfig, tempFiles: string[]): Promise<void> {
-        logger.info('Creating schema dumps...');
-        const schemaDumpService = new SchemaDumpService(this.configManager, this.databaseManager);
-        
-        // dump main schema (structure only, no data)
-        await schemaDumpService.dumpSchemaBulk(this.config.mainDatabaseConfig, tmpFileConfig);
-        tempFiles.push(`${tmpFileConfig.schemaOutputDir}/tmp_dump.sql`);
-        
-        // check and dump migration history if it exists
-        const migHistoryExists = await this.checkMigrationHistoryExists();
-        if (migHistoryExists) {
-            logger.info('Dumping migration history with data...');
-            await schemaDumpService.dumpTable(
-                MigrationService.MIGRATION_HISTORY_TABLE, 
-                this.config.mainDatabaseConfig, 
-                tmpFileConfig
-            );
-            tempFiles.push(`${tmpFileConfig.schemaOutputDir}/${MigrationService.MIGRATION_HISTORY_TABLE}.sql`);
-        } else {
-            logger.info('No migration history found - will start with empty migration table');
-        }
-    }
-
-    /**
-     * Setup temporary databases and restore schema/data
-     */
-    private async setupTemporaryDatabases(
-        tmpMainConfig: DatabaseConfig, 
-        tmpMigConfig: DatabaseConfig, 
-        tmpFileConfig: FileConfig,
-        tempFiles: string[]
-    ): Promise<void> {
-        logger.info('Setting up temporary databases...');
-        
-        const isSameDatabase = this.isSameDatabase(tmpMainConfig, tmpMigConfig);
-        const migHistoryFile = `${tmpFileConfig.schemaOutputDir}/${MigrationService.MIGRATION_HISTORY_TABLE}.sql`;
-        const hasMigrationHistoryFile = tempFiles.includes(migHistoryFile);
-        
-        // Create temporary main database
-        await this.createTemporaryDatabase(tmpMainConfig);
-        
-        // Create temporary migration database only if different from main
-        if (!isSameDatabase) {
-            await this.createTemporaryDatabase(tmpMigConfig);
-        }
-        
-        // restore main schema to temporary database
-        logger.info('Restoring main schema to temporary database...');
-        await this.executeSqlCommand(
-            tmpMainConfig, 
-            `${tmpFileConfig.schemaOutputDir}/tmp_dump.sql`
+    private async handleMigrationHistory(connection: Connection, config: Config): Promise<string | undefined> {
+        // check if mig history table exists
+        const hasMigrationHistory = await this.databaseManager.tableExists(
+            connection,
+            MIGRATION_HISTORY_TABLE
         );
-        
-        // handle migration history based on whether it's same or different database
-        if (isSameDatabase) {
-            // migration history is in the same database as main schema
-            if (hasMigrationHistoryFile) {
-                // migration history data exists - restore it to the same database
-                logger.info('Restoring migration history data to main temporary database...');
-                await this.restoreMigrationHistoryData(tmpMainConfig, migHistoryFile);
-            } else {
-                // mo migration history exists - table structure is already created by main schema
-                logger.info('No migration history data found - using empty migration_history table from main schema');
-            }
-        } else {
-            // migration history is in a separate database
-            if (hasMigrationHistoryFile) {
-                logger.info('Restoring migration history to separate temporary database...');
-                await this.executeSqlCommand(tmpMigConfig, migHistoryFile);
-            } else {
-                // create empty migration history table in separate database
-                logger.info('Creating empty migration history table in separate database...');
-                const tmpMigConnection = await this.databaseManager.connect(tmpMigConfig);
-                try {
-                    await this.validateMigrationsTable(tmpMigConnection);
-                } finally {
-                    await tmpMigConnection.end();
-                }
-            }
+
+        if (!hasMigrationHistory) {
+            logger.info('No migration history found. Will generate migration_history table on restore');
+            return undefined;
         }
+
+        logger.info('Migration history table found. Dumping migration_history data');
+        const schemaDumpService = new SchemaDumpService(this.databaseManager);
+        const dumpPath = await schemaDumpService.dumpTable(
+            MIGRATION_HISTORY_TABLE,
+            config.mainDatabaseConfig,
+            config.fileConfig
+        );
+        logger.info('Successfully dumped migration history');
+        return dumpPath;
     }
 
     /**
-     * Create a temporary database
+     * Sets up temporary database with schema and migration history
+     */
+    private async setupTemporaryDatabase(
+        schemaPath: string,
+        migrationHistoryPath?: string
+    ): Promise<void> {
+        logger.info('Setting up temporary database...');
+
+        await this.createTemporaryDatabase(this.config.migrationDatabaseConfig);
+
+        logger.info('Restoring main schema to temporary database...');
+        await this.executeSqlCommand(this.config.migrationDatabaseConfig, schemaPath);
+
+        logger.info("Initializing migration history table");
+        const initMigrationsPath = path.join(this.__dirname, '..', '..', 'database/init_migrations.sql');
+        await this.executeSqlCommand(this.config.migrationDatabaseConfig, initMigrationsPath);
+
+        if (migrationHistoryPath) {
+            await this.restoreMigrationHistoryData(this.config.migrationDatabaseConfig, migrationHistoryPath);
+        }
+
+        logger.info("Temporary database setup completed");
+    }
+
+    /**
+     * Creates a temporary database
      */
     private async createTemporaryDatabase(databaseConfig: DatabaseConfig): Promise<void> {
         const serverConfig = { ...databaseConfig };
-        delete serverConfig.database; // Connect to server (not a specific database)
-        
+        delete serverConfig.database;
+
         const connection = await this.databaseManager.connect(serverConfig);
         try {
             logger.info(`Creating temporary database: ${databaseConfig.database}`);
@@ -189,41 +157,24 @@ export class MigrationService {
     }
 
     /**
-     * Restore migration history data only (not table structure)
-     * This is used when migration_history table already exists in the main schema dump
+     * Restores migration history data (INSERT statements only)
      */
-    private async restoreMigrationHistoryData(databaseConfig: DatabaseConfig, migHistoryFile: string): Promise<void> {
+    private async restoreMigrationHistoryData(
+        databaseConfig: DatabaseConfig,
+        migHistoryFile: string
+    ): Promise<void> {
         try {
-            // read the migration history SQL file
             const sqlContent = FileManager.readFile(migHistoryFile);
-            
-            // extract only INSERT statements, skip CREATE TABLE and other DDL
             const insertStatements = this.extractInsertStatements(sqlContent);
-            
+
             if (insertStatements.length === 0) {
                 logger.info('No migration history data to restore');
                 return;
             }
-            
-            // execute only the INSERT statements
-            const connection = await this.databaseManager.connect(databaseConfig);
-            try {
-                await connection.beginTransaction();
-                
-                for (const insertStatement of insertStatements) {
-                    await connection.query(insertStatement);
-                }
-                
-                await connection.commit();
-                logger.info(`Restored ${insertStatements.length} migration history records`);
-                
-            } catch (error) {
-                await connection.rollback();
-                throw error;
-            } finally {
-                await connection.end();
-            }
-            
+
+            await this.executeInsertStatements(databaseConfig, insertStatements);
+            logger.info(`Restored ${insertStatements.length} migration history records`);
+
         } catch (error) {
             logger.error(ERROR_MESSAGES.MIGRATION.RESTORE_HISTORY, error);
             throw error;
@@ -231,77 +182,61 @@ export class MigrationService {
     }
 
     /**
-     * Extract INSERT statements from SQL dump, ignoring DDL statements
+     * Executes INSERT statements in a transaction
+     */
+    private async executeInsertStatements(
+        databaseConfig: DatabaseConfig,
+        insertStatements: string[]
+    ): Promise<void> {
+        const connection = await this.databaseManager.connect(databaseConfig);
+        try {
+            await connection.beginTransaction();
+
+            for (const insertStatement of insertStatements) {
+                await connection.query(insertStatement);
+            }
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            await connection.end();
+        }
+    }
+
+    /**
+     * Extracts INSERT statements from SQL dump, ignoring DDL statements
      */
     private extractInsertStatements(sqlContent: string): string[] {
         const lines = sqlContent.split('\n');
         const insertStatements: string[] = [];
-        
+        const skipPatterns = ['--', '/*', 'DROP', 'CREATE', 'ALTER', 'LOCK', 'UNLOCK'];
+
         for (const line of lines) {
             const trimmedLine = line.trim();
-            
-            // skip empty lines, comments, and DDL statements
-            if (!trimmedLine || 
-                trimmedLine.startsWith('--') || 
-                trimmedLine.startsWith('/*') || 
-                trimmedLine.startsWith('DROP') ||
-                trimmedLine.startsWith('CREATE') ||
-                trimmedLine.startsWith('ALTER') ||
-                trimmedLine.startsWith('LOCK') ||
-                trimmedLine.startsWith('UNLOCK')) {
+
+            if (!trimmedLine || this.shouldSkipLine(trimmedLine, skipPatterns)) {
                 continue;
             }
-            
-            // include INSERT statements
+
             if (trimmedLine.startsWith('INSERT')) {
                 insertStatements.push(trimmedLine);
             }
         }
-        
+
         return insertStatements;
     }
 
     /**
-     * Check if migration history table exists in source
+     * Checks if a line should be skipped during INSERT extraction
      */
-    private async checkMigrationHistoryExists(): Promise<boolean> {
-        let connection: Connection | null = null;
-        try {
-            connection = await this.databaseManager.connect(this.config.mainDatabaseConfig);
-            return await this.databaseManager.tableExists(connection, MigrationService.MIGRATION_HISTORY_TABLE);
-        } catch (error) {
-            logger.error(ERROR_MESSAGES.TABLE.EXISTS(MigrationService.MIGRATION_HISTORY_TABLE), error);
-            throw error;
-        } finally {
-            if (connection) await connection.end();
-        }
+    private shouldSkipLine(line: string, skipPatterns: string[]): boolean {
+        return skipPatterns.some(pattern => line.startsWith(pattern));
     }
 
     /**
-     * Create temporary database configuration
-     */
-    private createTempDatabaseConfig(originalConfig: DatabaseConfig): DatabaseConfig {
-        const timestamp = Date.now();
-        return {
-            ...originalConfig,
-            database: `${MigrationService.TEMP_PREFIX}${originalConfig.database}_${timestamp}`
-        };
-    }
-
-    /**
-     * Check if two database configurations point to same database
-     */
-    private isSameDatabase(db1: DatabaseConfig, db2: DatabaseConfig): boolean {
-        return (
-            db1.host === db2.host &&
-            db1.port === db2.port &&
-            db1.database === db2.database &&
-            db1.user === db2.user
-        );
-    }
-
-    /**
-     * Execute SQL file against database
+     * Executes SQL file against database using mysql command
      */
     private async executeSqlCommand(databaseConfig: DatabaseConfig, file: string): Promise<void> {
         const args = [
@@ -313,7 +248,7 @@ export class MigrationService {
 
         const mysqlCmd = `mysql ${args.join(' ')}`;
         const cmd = `${mysqlCmd} < ${file}`;
-        
+
         try {
             logger.info(`Executing SQL file: ${file}`);
             await runCommand(cmd, databaseConfig.password);
@@ -324,121 +259,131 @@ export class MigrationService {
         }
     }
 
+
+    private async dumpSchema(databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
+        logger.info('Creating schema dump...');
+        const schemaDumpService = new SchemaDumpService(this.databaseManager);
+        const schemaDumpPath = await schemaDumpService.dumpSchemaBulk(databaseConfig, fileConfig);
+        logger.info('Schema dump successfully completed');
+        return schemaDumpPath;
+    }
+
+     private async dumpSchemaTableByTable(databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<void> {
+        logger.info('Creating schema dump...');
+        const schemaDumpService = new SchemaDumpService(this.databaseManager);
+        const schemaDumpPath = await schemaDumpService.dumpSchema(databaseConfig, fileConfig);
+        logger.info('Schema dump successfully completed');
+        //return schemaDumpPath;
+    }
+
     /**
-     * Cleanup all temporary resources
+     * Cleans up temporary database and connections
      */
     private async cleanup(
-        tmpMainConnection: Connection | null,
-        tmpMigConnection: Connection | null,
-        tmpMainConfig: DatabaseConfig,
-        tmpMigConfig: DatabaseConfig,
-        tempFiles: string[]
+        //connection: Connection | null,
+        //databaseConfig: DatabaseConfig
     ): Promise<void> {
-        logger.info('Cleaning up temporary resources...');
-        
-        // cleanup databases
-        const cleanupPromises: Promise<void>[] = [];
-        
-        if (tmpMainConnection) {
-            cleanupPromises.push(
-                this.databaseManager.dropDatabase(tmpMainConnection, tmpMainConfig.database!)
-                    .catch(error => {
-                        logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
-                    })
-                    .finally(() => tmpMainConnection?.end())
-            );
-        }
-        
-        if (tmpMigConnection && tmpMigConnection !== tmpMainConnection) {
-            cleanupPromises.push(
-                this.databaseManager.dropDatabase(tmpMigConnection, tmpMigConfig.database!)
-                    .catch(error => {
-                        logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
-                    })
-                    .finally(() => tmpMigConnection?.end())
-            );
-        }
-        
-        // wait for the cleanup to finish
-        await Promise.allSettled(cleanupPromises);
-        
-        // cleanup temporary files
-        for (const file of tempFiles) {
-            try {
-                if (FileManager.fileExists && FileManager.fileExists(file)) {
-                    FileManager.removeFile(file);
-                    logger.info(`Removed temporary file: ${file}`);
-                }
-            } catch (error) {
-                logger.warn(ERROR_MESSAGES.MIGRATION.CLEANUP_FILE(file), error);
-            }
-        }
-        
-        logger.info('Cleanup completed');
+        //if (!connection) return;
+        logger.info('Winding down docker service')
+        await runCommand(DOCKER_DOWN_COMMAND)
+        /*try {
+            await this.databaseManager.dropDatabase(connection, databaseConfig.database);
+        } catch (error) {
+            logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
+        } finally {
+            await connection.end();
+        }*/
     }
 
     /**
-     * Migrate database table
+     * Runs migrations on the specified database
      */
-    async migrate(_mainConnection?: Connection, _migrationHistoryConnection?: Connection) {
-        let config = this.configManager.getConfig();
-        let mainConnection!: Connection;
-        let migrationHistoryConnection!: Connection;
-
+    async migrate(
+        connection: Connection,
+        dbConfig: DatabaseConfig,
+        fileConfig: FileConfig
+    ): Promise<void> {
         try {
-            // 1. connect to the main and mig history database (they can be separate or the same)
-            mainConnection = _mainConnection ?? await this.databaseManager.connect(config.mainDatabaseConfig)
-            migrationHistoryConnection = _migrationHistoryConnection ?? await this.databaseManager.connect(config.migrationDatabaseConfig)
-            
-            await this.validateMigrationsTable(migrationHistoryConnection)
-            logger.info("Migration history table validated")
+            // checks if the migration table exists
+            let migHistory = await this.checkMigrationHistoryExists(connection)
+            if (migHistory)
+                await this.validateMigrationsTable(connection);
 
-            const migrationFiles = FileManager
-                .readDirectory(config.fileConfig.migrationsDir)
-                .filter(file => file.endsWith('.sql'))
-                .sort()
+            logger.info("Migration history table validated");
+            const { unappliedMigrations, appliedMigrations } = await this.getUnappliedAndAppliedMigrations(connection);
 
-            // 2. get applied migrations
-            let appliedMigrations: MigrationRow[] = await this.getAppliedMigrations(migrationHistoryConnection)
-            let appliedMigrationsSet = new Set(appliedMigrations.map(m => m.name))
-            logger.info(`Existing .sql migration files: \n ${migrationFiles.join(',\n ')}`)
-            
-            // 3. unapplied migrations
-            for (const migrationFile of migrationFiles) {
-                if (appliedMigrationsSet.has(migrationFile)) {
-                    logger.info(`Skipping already applied migration: ${migrationFile}`)
-                    continue;
-                }
-                
-                // apply the migration that was not yet applied
-                const filePath = path.join(config.fileConfig.migrationsDir, migrationFile)
-                await this.applyMigration(mainConnection, migrationHistoryConnection, filePath, migrationFile)
+            if (appliedMigrations.size > 0) {
+                appliedMigrations.forEach(migrationName => {
+                    logger.info(`Skipping already applied migration file ${migrationName}`);
+                })
             }
+
+            await this.applyMigrations(connection, unappliedMigrations, fileConfig);
             
-        } catch(error: any) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.MIGRATION.MIGRATE(error.message || error.toString()));
             throw error;
-        } finally {
-            // only close if we created the connections
-            if (!_mainConnection) {
-                logger.info('Closing main database connection')
-                await mainConnection?.end();
-            }
-            if (!_migrationHistoryConnection) {
-                logger.info('Closing migration history database connection')
-                await migrationHistoryConnection?.end()
-            }
         }
     }
 
     /**
-     * Get applied migrations from migration history table
-     * @param migrationHistoryConnection database connection for the mig history table
-     * @returns database row for migrations
+     * Applies all unapplied migrations
      */
-    private async getAppliedMigrations(migrationHistoryConnection: Connection): Promise<MigrationRow[]> {
+    private async applyMigrations(
+        connection: Connection,
+        unappliedMigrations: Set<string>,
+        fileConfig: FileConfig
+    ): Promise<void> {
+        for (const migrationFile of unappliedMigrations) {
+            const filePath = path.join(fileConfig.migrationsDir, migrationFile);
+            await this.applyMigration(connection, filePath, migrationFile);
+        }
+    }
+
+    /**
+     * Gets unapplied and applied migrations
+     */
+    private async getUnappliedAndAppliedMigrations(connection: Connection): Promise<MigrationResult> {
+        const appliedMigrations = await this.getAppliedMigrations(connection);
+        const appliedMigrationsSet = new Set<string>(appliedMigrations.map(m => m.name));
+
+        const migrationFiles = this.getMigrationFiles();
+        const unappliedMigrations = new Set<string>(
+            migrationFiles.filter(file => !appliedMigrationsSet.has(file))
+        );
+
+        return {
+            unappliedMigrations,
+            appliedMigrations: appliedMigrationsSet
+        };
+    }
+
+    private async checkMigrationHistoryExists(connection: Connection): Promise<boolean> {
         try {
-            const [rows] = await migrationHistoryConnection.execute<MigrationRow[]>(
+            return await this.databaseManager.tableExists(connection, MIGRATION_HISTORY_TABLE);
+        } catch (error) {
+            logger.error(ERROR_MESSAGES.TABLE.EXISTS(MIGRATION_HISTORY_TABLE), error);
+            throw error;
+        }
+    }
+
+
+    /**
+     * Gets all migration files from the migrations directory
+     */
+    private getMigrationFiles(): string[] {
+        return FileManager
+            .readDirectory(this.config.fileConfig.migrationsDir)
+            .filter(file => file.endsWith('.sql'))
+            .sort();
+    }
+
+    /**
+     * Gets applied migrations from migration history table
+     */
+    private async getAppliedMigrations(connection: Connection): Promise<MigrationRow[]> {
+        try {
+            const [rows] = await connection.execute<MigrationRow[]>(
                 "SELECT * FROM migration_history ORDER BY id ASC"
             );
             return rows;
@@ -449,62 +394,55 @@ export class MigrationService {
     }
 
     /**
-     * Apply a single migration
+     * Applies a single migration file
      */
     private async applyMigration(
-        mainConnection: Connection, 
-        migrationHistoryConnection: Connection, 
-        filePath: string, 
+        connection: Connection,
+        filePath: string,
         fileName: string
     ): Promise<void> {
-        const sql = FileManager.readFile(filePath)
+        const sql = FileManager.readFile(filePath);
+
         try {
-            logger.info(`Applying migration: ${fileName}`)
-            
-            await mainConnection.beginTransaction();
-            await migrationHistoryConnection.beginTransaction();
-            
-            // execute the migration SQL
-            await mainConnection.query(sql);
-            
-            // record the migration in history
-            await migrationHistoryConnection.query(
-                `INSERT INTO migration_history (name) VALUES (?)`, 
+            logger.info(`Applying migration: ${fileName}`);
+            await connection.beginTransaction();
+
+            await connection.query(sql);
+            await connection.query(
+                `INSERT INTO migration_history (name) VALUES (?)`,
                 [fileName]
             );
-            
-            await mainConnection.commit();
-            await migrationHistoryConnection.commit();
-            
-            logger.info(`Applied migration successfully: ${fileName}`)
-        } catch (err: any) {
-            logger.error(ERROR_MESSAGES.MIGRATION.FAILED_MIGRATION(fileName))
-            
+
+            await connection.commit();
+            logger.info(`Applied migration successfully: ${fileName}`);
+
+        } catch (error: any) {
+            logger.error(ERROR_MESSAGES.MIGRATION.FAILED_MIGRATION(fileName));
+
             try {
-                await mainConnection.rollback();
-                await migrationHistoryConnection.rollback();
+                await connection.rollback();
             } catch (rollbackError) {
                 logger.error(ERROR_MESSAGES.MIGRATION.ROLLBACK, rollbackError);
                 throw rollbackError;
             }
-            
-            logger.error(err.stack)
-            throw err
+
+            logger.error(error.stack);
+            throw error;
         }
     }
 
     /**
-     * Validate/create migrations table
+     * Validates/creates migrations table
      */
-    private async validateMigrationsTable(conn: Connection): Promise<void> {
-        logger.info('Validating migrations table')
-        const initSqlPath = path.join(this.__dirname, '..','..', 'database', 'init_migrations.sql');
-        
-        if (!FileManager.fileExists || !FileManager.fileExists(initSqlPath)) {
+    private async validateMigrationsTable(connection: Connection): Promise<void> {
+        logger.info('Validating migrations table');
+        const initSqlPath = path.join(this.__dirname, '..', '..', 'database', 'init_migrations.sql');
+
+        if (!FileManager.fileExists(initSqlPath)) {
             throw new Error(ERROR_MESSAGES.MIGRATION.INIT_FILE_MISSING(initSqlPath));
         }
-        
-        const createTable = FileManager.readFile(initSqlPath)
-        await conn.execute(createTable.toString());
+
+        const createTableSql = FileManager.readFile(initSqlPath);
+        await connection.execute(createTableSql);
     }
 }

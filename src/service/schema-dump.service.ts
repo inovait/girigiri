@@ -1,9 +1,7 @@
-import { runCommand } from "../helpers.ts";
-import type { Config } from "../interface/config.interface.ts";
+import { runCommand } from "../utils.ts";
 import type { DatabaseConfig } from "../interface/database-config.interface.ts";
 import type { FileConfig } from "../interface/file-config.interface.ts";
 import logger from "../logging/logger.ts";
-import { ConfigManager } from "../manager/config.manager.ts";
 import { DatabaseManager } from "../manager/database.manager.ts";
 import { FileManager } from "../manager/file.manager.ts";
 import { MIGRATION_HISTORY_TABLE } from "../constants/constants.ts";
@@ -12,14 +10,12 @@ import type { Connection } from "mysql2/promise";
 
 export class SchemaDumpService {
   private databaseManager: DatabaseManager
-  private config: Config;
 
-  constructor(configManager: ConfigManager, databaseManager: DatabaseManager) {
+  constructor(databaseManager: DatabaseManager) {
     this.databaseManager = databaseManager;
-    this.config = configManager.getConfig();
   }
 
-  async dumpSchemaBulk(databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
+  async dumpSchemaBulk(databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
     let args = [
       `-u${databaseConfig.user}`,
       `-h${databaseConfig.host}`,
@@ -42,21 +38,23 @@ export class SchemaDumpService {
     const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/tmp_dump.sql`;
 
     try {
-      await runCommand(dumpCommand, this.config.mainDatabaseConfig.password)
-      logger.info('Schema succesfully dumped')
+      await runCommand(dumpCommand, databaseConfig.password)
+      logger.info('Schema succesfully dumped, returning temp file path')
+      return `${fileConfig.schemaOutputDir}/tmp_dump.sql`
     } catch (err) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.BULK, err);
       throw err
     }
   }
 
+
   /**
    * dumps the schema table by table
    */
-  async dumpSchema() {
+  async dumpSchema(databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
     // first check if directory for outputing the migrations exists
     // create if it doesnt
-    let outputDir: string = this.config.fileConfig.migrationsDir
+    let outputDir: string = fileConfig.migrationsDir
     if (!FileManager.checkDirectory(outputDir)) {
       FileManager.makeDirectory(outputDir)
       logger.info(`Created directory: ${outputDir}`);
@@ -65,10 +63,10 @@ export class SchemaDumpService {
     }
 
     // retrieve the schema tables
-    let tables = await this.getTables()
+    let tables = await this.getTables(databaseConfig)
     for (let table of tables) {
       try {
-        await this.dumpTable(table, this.config.mainDatabaseConfig, this.config.fileConfig)
+        await this.dumpTable(table, databaseConfig, fileConfig)
       } catch (err) {
         logger.error(ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR, err);
         throw err;
@@ -76,12 +74,12 @@ export class SchemaDumpService {
     }
   }
 
-  private async getTables() {
+  private async getTables(databaseConfig: DatabaseConfig) {
     let mainConnection!: Connection;
     try {
-      mainConnection = await this.databaseManager.connect(this.config.mainDatabaseConfig)
+      mainConnection = await this.databaseManager.connect(databaseConfig)
       const [tables]: any[] = await mainConnection.query(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [this.config.mainDatabaseConfig.database]);
+        `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [databaseConfig.database]);
 
       return tables.map((row: any) => { return row.TABLE_NAME })
     } catch (error) {
@@ -92,7 +90,7 @@ export class SchemaDumpService {
     }
   }
 
-  public async dumpTable(table: string, config: DatabaseConfig, fileConfig: FileConfig) {
+  public async dumpTable(table: string, config: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
     let args = [
       `-u ${config.user}`,
       `-h ${config.host}`,
@@ -113,7 +111,7 @@ export class SchemaDumpService {
     try {
       logger.info(`Dumping table: ${table}`)
       await runCommand(dumpCommand,config.password)
-      logger.info('Table succesfully dumped')
+      return `${fileConfig.schemaOutputDir}/${table}.sql`
     } catch (err) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.TABLE(table), err);
       throw err
