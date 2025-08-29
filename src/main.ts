@@ -4,66 +4,67 @@ import { MigrationService } from "./service/migration.service.ts";
 import { SchemaDumpService } from "./service/schema-dump.service.ts";
 import { ConfigManager } from "./manager/config.manager.ts";
 import { DatabaseManager } from "./manager/database.manager.ts";
+import logger from "./logging/logger.ts";
+
+const configManager = ConfigManager.getInstance();
+const databaseManager = new DatabaseManager();
+const migrationService = new MigrationService(configManager, databaseManager);
+const schemaDumpService = new SchemaDumpService(databaseManager);
+
+
+async function runCliAction(
+  action: () => Promise<void>,
+  successMessage: string
+) {
+  try {
+    await action();
+    logger.info(successMessage);
+    process.exit(0);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.stack || err.message : String(err);
+    //logger.error(`Action failed:\n${errorMessage}`);
+    process.exit(1); 
+  }
+}
+
 
 const program = new Command();
 
 program
   .command("migrate")
-  .description("Run database migrations")
-  .action(async () => {
-    try {
-      const configManager = ConfigManager.getInstance();
-      const databaseManager = new DatabaseManager();
-      const migrationService = new MigrationService(configManager, databaseManager);
-      
-      let connection1 = await databaseManager.connect(configManager.getConfig().mainDatabaseConfig)
-      let connection2 = await databaseManager.connect(configManager.getConfig().mainDatabaseConfig)
-
-      await migrationService.migrate(connection1, connection2);
-      console.log("Migrations completed successfully");
-    } catch (err) {
-      console.error("Migration failed:", err);
-      process.exit(1);
-    }
-  });
+  .description("Run database migrations against the main database")
+  .action(() =>
+    runCliAction(async () => {
+      const config = configManager.getConfig();
+      const connection = await databaseManager.connect(config.mainDatabaseConfig);
+      await migrationService.migrate(
+        connection,
+        config.mainDatabaseConfig,
+        config.fileConfig
+      );
+    }, "Migrations completed successfully")
+  );
 
 program
   .command("dump:schema")
-  .description("Dump current database schema")
-  .action(async () => {
-    try {
-      const configManager = ConfigManager.getInstance();
-      const databaseManager = new DatabaseManager();
-      const schemaDumpService = new SchemaDumpService(configManager, databaseManager);
-
-      await schemaDumpService.dumpSchema();
-      console.log("Schema dumped successfully");
-    } catch (err) {
-      console.error("Schema dump failed:", err);
-      process.exit(1);
-    }
-  });
+  .description("Dump the schema of the main database")
+  .action(() =>
+    runCliAction(async () => {
+      const config = configManager.getConfig();
+      await schemaDumpService.dumpSchema(
+        config.mainDatabaseConfig,
+        config.fileConfig
+      );
+    }, "Schema dumped successfully")
+  );
 
 program
   .command("check:migrations")
-  .description("Check pending migrations")
-  .action(async () => {
-    try {
-      const configManager = ConfigManager.getInstance();
-      const databaseManager = new DatabaseManager();
-      const migrationService = new MigrationService(configManager, databaseManager);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // ali zelis da se baza na konc dropne
-      // ali zelis da se migracije izvajajo na tmp ali na main bazi
-
-
+  .description("Validate migrations against a temporary database")
+  .action(() =>
+    runCliAction(async () => {
       await migrationService.checkMigrations();
-      console.log("Migration check completed successfully");
-    } catch (err) {
-      console.error("Migration check failed:", err);
-      process.exit(1);
-    }
-  });
+    }, "Migration check completed successfully")
+  );
 
 program.parse(process.argv);

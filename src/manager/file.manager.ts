@@ -19,7 +19,14 @@ export const FileManager = {
       throw new Error(`Error checking directory ${directory_path}: ${error}`);
     }
   },
-
+  removeDirectory(directory_path: string) {
+    try {
+      fs.rmSync(directory_path, { recursive: true, force: true });
+    } catch (error) {
+      throw new Error(`Error removing directory ${directory_path}: ${error}`);
+    }
+      
+  },
   makeDirectory(directory_path: string) {
     if (!directory_path) {
       throw new Error(ERROR_MESSAGES.FILE.PATH_REQUIRED);
