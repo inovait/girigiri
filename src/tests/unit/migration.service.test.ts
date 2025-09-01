@@ -1,21 +1,30 @@
 import { describe, it, beforeEach, expect, vi, Mock } from "vitest";
 import type { DatabaseConfig } from "../../interface/database-config.interface.ts";
-import dotenv from "dotenv";
+import { MigrationService } from "../../service/migration.service.ts";
+import { ConfigManager } from "../../manager/config.manager.ts";
+import { DatabaseManager } from "../../manager/database.manager.ts";
+import { FileManager } from "../../manager/file.manager.ts";
+import { SchemaDumpService } from "../../service/schema-dump.service.ts";
+import logger from "../../logging/logger.ts";
+import type { FileConfig } from "../../interface/file-config.interface.ts";
+import { runMySqlCommand } from "../../utils.ts";
+import { ERROR_MESSAGES } from "../../constants/error-messages.ts";
+import { MAIN_DB_TMP, MIGRATION_HISTORY_TABLE } from "../../constants/constants.ts";
+import { SchemaComparisonService } from "../../service/schema-comparison.service.ts";
 
-dotenv.config();
-const mockMigrationSql: string = "001_migration.sql"
+const mockMigrationSql = "001_migration.sql";
 
-// mock helpers
-vi.mock("../../helpers.ts", () => ({
-    runCommand: vi.fn(() => Promise.resolve()), // always succeed
+// mock dependencies
+vi.mock("../../utils.ts", () => ({
+    runMySqlCommand: vi.fn(() => Promise.resolve()),
+    getPaths: vi.fn(() => ({ __dirname: "/fake/dir" })),
+    execAsync: vi.fn()
 }));
 
-// mock logger
 vi.mock("../../logging/logger.ts", () => ({
     default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-// mock file manager
 vi.mock("../../manager/file.manager.ts", () => ({
     FileManager: {
         readFile: vi.fn(() => "CREATE TABLE dummy;"),
@@ -25,206 +34,151 @@ vi.mock("../../manager/file.manager.ts", () => ({
     },
 }));
 
+vi.mock("../../service/schema-dump.service.ts");
+vi.mock("../../service/schema-comparison.service.ts")
+
+// ---------------- imports after mocks ----------------
 const mainDatabaseConfig: DatabaseConfig = {
-                host: "localhost",
-                port: 3306,
-                user: "root",
-                password: "pw",
-                database: "main_db",
-                waitForConnections: true,
-                multipleStatements: true,
-                connectionLimit: 10,
-                queueLimit: 0
-            }
-
+    host: "localhost", port: 3306, user: "root", password: "pw", database: "main_db",
+    waitForConnections: true, multipleStatements: true, connectionLimit: 10, queueLimit: 0
+};
 const migrationDatabaseConfig: DatabaseConfig = {
-                host: "localhost",
-                port: 3306,
-                user: "root",
-                password: "pw",
-                database: "mig_db",
-                waitForConnections: true,
-                multipleStatements: true,
-                connectionLimit: 10,
-                queueLimit: 0
-            }
+    host: "localhost", port: 3306, user: "root", password: "pw", database: "mig_db",
+    waitForConnections: true, multipleStatements: true, connectionLimit: 10, queueLimit: 0
+};
+const fileConfig: FileConfig = { migrationsDir: "migrations", schemaOutputDir: "schemas" };
 
-const fileConfig: FileConfig = { migrationsDir: "migrations",
-                schemaOutputDir: "schemas",}
+const mockSchemaDumpService = {
+    mySqlDump: vi.fn(() => Promise.resolve('dump/path/schema.sql')),
+    dumpTable: vi.fn(() => Promise.resolve('dump/path/table.sql')),
+    dumpSchema: vi.fn(() => Promise.resolve())
+};
 
+const mockSchemaComparisonService = {
+    compareSchemasBash: vi.fn(() => Promise.resolve()),
+    formatResult: vi.fn((isIdentical: boolean) => isIdentical ? 'Schemas are identical.' : 'Schemas differ.')
+}
 
-
-// mock SchemaDumpService
-vi.mock("../../service/schema-dump.service.ts", () => ({
-    SchemaDumpService: vi.fn(() => ({
-        dumpSchemaBulk: vi.fn(() => Promise.resolve()),
-        dumpTable: vi.fn(() => Promise.resolve()),
-    })),
-}));
-
-// ------------------ Imports AFTER mocks ------------------
-import { MigrationService } from "../../service/migration.service.ts";
-import { ConfigManager } from "../../manager/config.manager.ts";
-import { DatabaseManager } from "../../manager/database.manager.ts";
-import { FileManager } from "../../manager/file.manager.ts";
-import { SchemaDumpService } from "../../service/schema-dump.service.ts";
-import logger from "../../logging/logger.ts";
-import { FileConfig } from "../../interface/file-config.interface.ts";
-
-// ------------------ Test Suite ------------------
-
-describe("MigrationService - checkMigrations", () => {
+// ---------------- Test Suite ----------------
+ 
+describe("MigrationService", () => {
     let configManager: ConfigManager;
     let databaseManager: DatabaseManager;
-
-    beforeEach(() => {
-        configManager = ConfigManager.getInstance();
-
-        vi.spyOn(configManager, "getConfig").mockReturnValue({
-            mainDatabaseConfig, migrationDatabaseConfig, fileConfig
-        });
-
-        databaseManager = new DatabaseManager();
-    });
-
-    describe("success", () => {
-        let migrationService: MigrationService;
-
-        beforeEach(() => {
-            const fakeConnection = {
-                end: vi.fn(),
-                query: vi.fn().mockResolvedValue([[]]),
-                execute: vi.fn().mockResolvedValue([[]]),
-                beginTransaction: vi.fn().mockResolvedValue(undefined),
-                commit: vi.fn().mockResolvedValue(undefined),
-                rollback: vi.fn().mockResolvedValue(undefined),
-            };
-            vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConnection as any);
-            vi.spyOn(databaseManager, "createDatabase").mockResolvedValue();
-            vi.spyOn(databaseManager, "dropDatabase").mockResolvedValue();
-            vi.spyOn(databaseManager, "tableExists").mockResolvedValue(true);
-
-            migrationService = new MigrationService(configManager, databaseManager);
-        });
-
-        it("should run checkMigrations succesfully", async () => {
-            await expect(migrationService.checkMigrations()).resolves.toBeUndefined(); // check if no error is thrown
-
-            // Verify logger calls ( check if succesfully migrated and if validation was completed succesfully)
-            expect(logger.info).toHaveBeenCalledWith("Starting migration validation...");
-            expect(logger.info).toHaveBeenCalledWith(`Applying migration: ${mockMigrationSql}`)
-            expect(logger.info).toHaveBeenCalledWith(`Applied migration successfully: ${mockMigrationSql}`)
-            expect(logger.info).toHaveBeenCalledWith("Migration validation completed successfully");
-
-            // Verify DatabaseManager methods
-            expect(databaseManager.createDatabase).toHaveBeenCalled();
-            expect(databaseManager.connect).toHaveBeenCalled();
-            expect(databaseManager.dropDatabase).toHaveBeenCalled();
-
-            // Verify FileManager methods
-            expect(FileManager.readFile).toHaveBeenCalled();
-            expect(FileManager.readDirectory).toHaveBeenCalled();
-            expect(FileManager.fileExists).toHaveBeenCalled();
-
-            // Verify SchemaDumpService was instantiated and no error was thrown
-            expect(() => {
-                expect((SchemaDumpService as unknown as Mock).mock.instances.length).toBeGreaterThan(0);
-            }).not.toThrow();
-
-        });
-    });
-
-    describe("failure", () => {
-        let migrationService: MigrationService;
-
-        beforeEach(() => {
-            const failingConnection = {
-                end: vi.fn(),
-                query: vi.fn().mockImplementation(() => Promise.reject(new Error("Migration failed"))),
-                execute: vi.fn().mockResolvedValue([[]]),
-                beginTransaction: vi.fn().mockResolvedValue(undefined),
-                commit: vi.fn().mockResolvedValue(undefined),
-                rollback: vi.fn().mockResolvedValue(undefined),
-            };
-
-            vi.spyOn(databaseManager, "connect").mockResolvedValue(failingConnection as any);
-            vi.spyOn(databaseManager, "createDatabase").mockResolvedValue();
-            vi.spyOn(databaseManager, "dropDatabase").mockResolvedValue();
-            vi.spyOn(databaseManager, "tableExists").mockResolvedValue(true);
-
-            migrationService = new MigrationService(configManager, databaseManager);
-        });
-
-        it("should throw and log an error if a migration fails", async () => {
-            await expect(migrationService.checkMigrations()).rejects.toThrow("Migration failed"); // check error was thrown
-
-            const conn = await databaseManager.connect({} as DatabaseConfig);
-            expect(conn.rollback).toHaveBeenCalled();
-
-            expect(logger.error).toHaveBeenCalledWith(
-                `Failed migration: ${mockMigrationSql}. Rolling back changes`
-            );
-        });
-    });
-});
-
-
-describe("MigrationService - migrate", () => {
     let migrationService: MigrationService;
-    let configManager: ConfigManager;
-    let databaseManager: DatabaseManager;
+    let fakeConnection: any;
 
     beforeEach(() => {
         vi.clearAllMocks();
-
-        configManager = ConfigManager.getInstance();
-        vi.spyOn(configManager, "getConfig").mockReturnValue({
-            mainDatabaseConfig, migrationDatabaseConfig, fileConfig
-        });
-
-        databaseManager = new DatabaseManager();
-        migrationService = new MigrationService(configManager, databaseManager);
-    });
-
-    it("should run migrations successfully", async () => {
-        const fakeConn = {
+        // reset mocks
+        fakeConnection = {
+            end: vi.fn(),
             query: vi.fn().mockResolvedValue([[]]),
             execute: vi.fn().mockResolvedValue([[]]),
             beginTransaction: vi.fn().mockResolvedValue(undefined),
             commit: vi.fn().mockResolvedValue(undefined),
             rollback: vi.fn().mockResolvedValue(undefined),
-            end: vi.fn(),
         };
 
-        vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
 
-        await migrationService.migrate();
+        vi.mocked(SchemaDumpService).mockImplementation(() => mockSchemaDumpService as any);
+        vi.mocked(SchemaComparisonService).mockImplementation(() => mockSchemaComparisonService as any);
 
-        expect(databaseManager.connect).toHaveBeenCalled();
-        expect(fakeConn.beginTransaction).toHaveBeenCalled();
-        expect(fakeConn.commit).toHaveBeenCalled();
-        expect(logger.info).toHaveBeenCalledWith(
-            `Applied migration successfully: ${mockMigrationSql}`
-        );
+        configManager = ConfigManager.getInstance();
+        vi.spyOn(configManager, "getConfig").mockReturnValue({
+            mainDatabaseConfig, tempDatabaseConfig: migrationDatabaseConfig, fileConfig
+        });
+
+        databaseManager = new DatabaseManager();
+        vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConnection as any);
+        vi.spyOn(databaseManager, "createDatabase").mockResolvedValue();
+        vi.spyOn(databaseManager, "dropDatabase").mockResolvedValue();
+        vi.spyOn(databaseManager, "tableExists").mockResolvedValue(true);
+
+        migrationService = new MigrationService(configManager, databaseManager);
     });
 
-    it("should rollback, throw and log error if migration fails (negative)", async () => {
-        const fakeConn = {
-            query: vi.fn().mockRejectedValue(new Error("Migration failed")),
-            execute: vi.fn().mockResolvedValue([[]]),
-            beginTransaction: vi.fn().mockResolvedValue(undefined),
-            commit: vi.fn().mockResolvedValue(undefined),
-            rollback: vi.fn().mockResolvedValue(undefined),
-            end: vi.fn(),
-        };
+    describe("checkMigrations", () => {
+        it("should run the full validation process successfully", async () => {    
+            vi.spyOn(mockSchemaComparisonService as any, 'compareSchemasBash').mockResolvedValue(true);
+            await expect(migrationService.checkMigrations()).resolves.toBeUndefined();
 
-        vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
+            expect(mockSchemaDumpService.mySqlDump).toHaveBeenCalledWith(mainDatabaseConfig, fileConfig, MAIN_DB_TMP);
+            expect(mockSchemaDumpService.dumpTable).toHaveBeenCalledWith(MIGRATION_HISTORY_TABLE, mainDatabaseConfig, fileConfig);
+            expect(databaseManager.createDatabase).toHaveBeenCalledWith(expect.anything(), migrationDatabaseConfig.database);
+            expect(runMySqlCommand).toHaveBeenCalled(); 
 
-        await expect(migrationService.migrate()).rejects.toThrow("Migration failed"); // to throw error
+            expect(logger.info).toHaveBeenCalledWith(`Applying migration: ${mockMigrationSql}`);
+            expect(logger.info).toHaveBeenCalledWith(`Applied migration successfully: ${mockMigrationSql}`);
 
-        expect(fakeConn.rollback).toHaveBeenCalled();
-        expect(logger.error).toHaveBeenCalledWith(
-            `Failed migration: ${mockMigrationSql}. Rolling back changes`
-        );
+            expect(mockSchemaDumpService.dumpSchema).toHaveBeenCalledWith(migrationDatabaseConfig, expect.objectContaining({
+                migrationsDir: fileConfig.migrationsDir,
+                schemaOutputDir: expect.stringContaining('tmp/schema-run-')
+            }));
+            
+            // assert that it completed successfully
+            expect(logger.info).toHaveBeenCalledWith('Check migrations completed successfully');
+        });
+
+
+        it("should exit early when no unapplied migrations are found", async () => {
+            // setup the migration file so that it is already applied
+            vi.spyOn(FileManager, "readDirectory").mockReturnValue([mockMigrationSql]);
+            (fakeConnection.execute as Mock).mockResolvedValueOnce([[{ name: mockMigrationSql }]]);
+
+            await migrationService.checkMigrations();
+
+            // assert that it exists early
+            expect(logger.info).toHaveBeenCalledWith("No unapplied migrations. Exiting");
+            expect(logger.info).not.toHaveBeenCalledWith("Unapplied migrations found. Setting up temporary database...");
+            expect(databaseManager.createDatabase).not.toHaveBeenCalled();
+        });
+
+        it("should throw and log an error if migration validation fails", async () => {
+            (fakeConnection.query as Mock).mockRejectedValue(new Error("Migration failed"));
+
+            await expect(migrationService.checkMigrations()).rejects.toThrow("Migration failed");
+
+            expect(logger.error).toHaveBeenCalledWith(
+                ERROR_MESSAGES.MIGRATION.VALIDATION,
+                expect.any(Error)
+            );
+        });
+    });
+
+    describe("migrate", () => {
+        it("should apply unapplied migrations successfully", async () => {
+            (fakeConnection.execute as Mock).mockResolvedValue([[]]);
+
+            await migrationService.migrate(fakeConnection as any, mainDatabaseConfig, fileConfig);
+
+            expect(fakeConnection.beginTransaction).toHaveBeenCalled();
+            expect(fakeConnection.query).toHaveBeenCalledWith("CREATE TABLE dummy;");
+            expect(fakeConnection.query).toHaveBeenCalledWith(
+                `INSERT INTO migration_history (name) VALUES (?)`, [mockMigrationSql]
+            );
+            expect(fakeConnection.commit).toHaveBeenCalled();
+            expect(logger.info).toHaveBeenCalledWith(`Applied migration successfully: ${mockMigrationSql}`);
+        });
+
+        it("should skip already applied migrations", async () => {
+           (fakeConnection.execute as Mock)
+                .mockResolvedValue([[{ name: mockMigrationSql }]]); // For getAppliedMigrations
+
+            await migrationService.migrate(fakeConnection as any, mainDatabaseConfig, fileConfig);
+
+            expect(logger.info).toHaveBeenCalledWith(`No outstanding migrations. Ending application`);
+            expect(fakeConnection.beginTransaction).not.toHaveBeenCalled();
+        });
+
+        it("should rollback, throw, and log an error if a migration fails", async () => {
+            const migrationError = new Error("Migration SQL failed");
+            (fakeConnection.query as Mock).mockRejectedValueOnce(migrationError);
+            (fakeConnection.execute as Mock).mockResolvedValue([[]]);
+
+            await expect(migrationService.migrate(fakeConnection as any, mainDatabaseConfig, fileConfig)).rejects.toThrow(migrationError);
+
+            expect(fakeConnection.rollback).toHaveBeenCalled();
+            expect(logger.error).toHaveBeenCalledWith(ERROR_MESSAGES.MIGRATION.FAILED_MIGRATION(mockMigrationSql));
+        });
     });
 });

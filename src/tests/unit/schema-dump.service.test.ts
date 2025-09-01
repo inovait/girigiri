@@ -1,11 +1,10 @@
-// tests/schema-dump.service.test.ts
 import { describe, it, beforeEach, expect, vi } from "vitest";
 import type { DatabaseConfig } from "../../interface/database-config.interface.ts";
 import type { FileConfig } from "../../interface/file-config.interface.ts";
 
 // mock helpers
-vi.mock("../../helpers.ts", () => ({
-  runCommand: vi.fn(() => Promise.resolve()),
+vi.mock("../../utils.ts", () => ({
+  runMySqlCommand: vi.fn(() => Promise.resolve()),
 }));
 
 // mock logger
@@ -23,12 +22,10 @@ vi.mock("../../manager/file.manager.ts", () => ({
 
 // ---------------- imports after mocks ----------------
 import { SchemaDumpService } from "../../service/schema-dump.service.ts";
-import { runCommand } from "../../helpers.ts";
+import { runMySqlCommand } from "../../utils.ts";
 import logger from "../../logging/logger.ts";
 import { FileManager } from "../../manager/file.manager.ts";
-import { ConfigManager } from "../../manager/config.manager.ts";
 import { DatabaseManager } from "../../manager/database.manager.ts";
-import { Config } from "../../interface/config.interface.ts";
 import { MIGRATION_HISTORY_TABLE } from "../../constants/constants.ts";
 import { ERROR_MESSAGES } from "../../constants/error-messages.ts";
 
@@ -37,47 +34,55 @@ describe("SchemaDumpService", () => {
   let schemaDumpService: SchemaDumpService;
   let databaseManager: DatabaseManager;
 
-  const fakeConfig = {
-    mainDatabaseConfig: {
-      host: "localhost",
-      port: 3306,
-      user: "root",
-      password: "pw",
-      database: "main_db",
-    } as DatabaseConfig,
-    fileConfig: {
-      migrationsDir: "migrations",
-      schemaOutputDir: "schemas",
-    } as FileConfig,
+  const fakeDbConfig: DatabaseConfig = {
+    host: "localhost",
+    port: 3306,
+    user: "root",
+    password: "pw",
+    database: "main_db",
+    multipleStatements: true,
+    queueLimit: 0,
+    connectionLimit: 0,
+    waitForConnections: true
   };
+
+  const fakeFileConfig: FileConfig = {
+    migrationsDir: "migrations",
+    schemaOutputDir: "schemas",
+  };
+
+  const fakeFileName = 'fakefileName'
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    const configManager = ConfigManager.getInstance();
-    // set a fake config
-    vi.spyOn(configManager, "getConfig").mockReturnValue(fakeConfig as Config);
-    // instantiate db manager
     databaseManager = new DatabaseManager();
-    schemaDumpService = new SchemaDumpService(configManager, databaseManager);
+    schemaDumpService = new SchemaDumpService(databaseManager);
   });
 
   describe("dumpSchemaBulk", () => {
-    it("should run mysqldump command successfully", async () => {
-      await schemaDumpService.dumpSchemaBulk(
-        fakeConfig.mainDatabaseConfig,
-        fakeConfig.fileConfig
-      );
+    it("should run mysqldump command successfully and return the temp file path", async () => {
+      const result = await schemaDumpService.mySqlDump(fakeDbConfig, fakeFileConfig, fakeFileName);
 
-      expect(runCommand).toHaveBeenCalled();
-      expect(logger.info).toHaveBeenCalledWith("Schema succesfully dumped");
+      expect(runMySqlCommand).toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith("Schema succesfully dumped, returning temp file path");
+      expect(result).toBe(`${fakeFileConfig.schemaOutputDir}/${fakeFileName}.sql`);
+    });
+
+    it("should create directory if it does not exist", async () => {
+      (FileManager.checkDirectory as any).mockReturnValueOnce(false);
+
+      await schemaDumpService.mySqlDump(fakeDbConfig, fakeFileConfig, fakeFileName);
+
+      expect(FileManager.checkDirectory).toHaveBeenCalledWith(fakeFileConfig.schemaOutputDir);
+      expect(FileManager.makeDirectory).toHaveBeenCalledWith(fakeFileConfig.schemaOutputDir);
+      expect(logger.info).toHaveBeenCalledWith("creating directory");
     });
 
     it("should log error and rethrow if runCommand fails", async () => {
-      (runCommand as any).mockRejectedValueOnce(new Error("fail"));
+      (runMySqlCommand as any).mockRejectedValueOnce(new Error("fail"));
 
       await expect(
-        schemaDumpService.dumpSchemaBulk(fakeConfig.mainDatabaseConfig, fakeConfig.fileConfig)
+        schemaDumpService.mySqlDump(fakeDbConfig, fakeFileConfig, fakeFileName)
       ).rejects.toThrow("fail");
 
       expect(logger.error).toHaveBeenCalledWith(
@@ -88,8 +93,7 @@ describe("SchemaDumpService", () => {
   });
 
   describe("dumpSchema", () => {
-    it("should create directory if not exists and dump tables", async () => {
-      // mock checkDirectory to "not exist"
+    it("should create directory if not exists and dump all tables", async () => {
       (FileManager.checkDirectory as any).mockReturnValueOnce(false);
 
       const fakeConn = {
@@ -98,23 +102,27 @@ describe("SchemaDumpService", () => {
       };
       vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
 
-      await schemaDumpService.dumpSchema();
+      await schemaDumpService.dumpSchema(fakeDbConfig, fakeFileConfig);
 
-      expect(FileManager.makeDirectory).toHaveBeenCalledWith("migrations");
-      expect(runCommand).toHaveBeenCalledTimes(2); // two tables
-      expect(logger.info).toHaveBeenCalledWith("Created directory: migrations");
+      expect(FileManager.makeDirectory).toHaveBeenCalledWith(fakeFileConfig.migrationsDir);
+      expect(logger.info).toHaveBeenCalledWith(`Created directory: ${fakeFileConfig.migrationsDir}`);
+      expect(runMySqlCommand).toHaveBeenCalledTimes(2); // two tables
+      expect(logger.info).toHaveBeenCalledWith("Dumping table: users");
+      expect(logger.info).toHaveBeenCalledWith("Dumping table: orders");
     });
 
-    it("should throw error if dumping a table fails and log error", async () => {
+    it("should log error and stop if dumping a table fails", async () => {
       const fakeConn = {
-        query: vi.fn().mockResolvedValue([[{ TABLE_NAME: "users" }]]),
+        query: vi.fn().mockResolvedValue([[{ TABLE_NAME: "users" }, { TABLE_NAME: "orders" }]]),
         end: vi.fn(),
       };
       vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
 
-      (runCommand as any).mockRejectedValueOnce(new Error("table dump fail"));
+      (runMySqlCommand as any).mockRejectedValueOnce(new Error("table dump fail"));
 
-      await expect(schemaDumpService.dumpSchema()).rejects.toThrow("table dump fail");
+      await expect(schemaDumpService.dumpSchema(fakeDbConfig, fakeFileConfig)).rejects.toThrow("table dump fail");
+      
+      expect(runMySqlCommand).toHaveBeenCalledTimes(1);
       expect(logger.error).toHaveBeenCalledWith(
         ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR,
         expect.any(Error)
@@ -122,13 +130,10 @@ describe("SchemaDumpService", () => {
     });
 
     it("should throw and log error when getTables fails", async () => {
-      const fakeConn = {
-        query: vi.fn().mockRejectedValue(new Error("connection fail")),
-        end: vi.fn(),
-      };
-      vi.spyOn(databaseManager, "connect").mockResolvedValue(fakeConn as any);
+      vi.spyOn(databaseManager, "connect").mockRejectedValue(new Error("connection fail"));
 
-      await expect(schemaDumpService.dumpSchema()).rejects.toThrow("connection fail");
+      await expect(schemaDumpService.dumpSchema(fakeDbConfig, fakeFileConfig)).rejects.toThrow("connection fail");
+      
       expect(logger.error).toHaveBeenCalledWith(
         ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES,
         expect.any(Error)
@@ -137,71 +142,39 @@ describe("SchemaDumpService", () => {
   });
 
   describe("dumpTable", () => {
-    it("should successfully complete one table dump", async () => {
-      await schemaDumpService.dumpTable(
-        "users",
-        fakeConfig.mainDatabaseConfig,
-        fakeConfig.fileConfig
-      );
+    it("should successfully dump a single table and return the file path", async () => {
+      const result = await schemaDumpService.dumpTable("users", fakeDbConfig, fakeFileConfig);
 
-      expect(runCommand).toHaveBeenCalled();
+      expect(runMySqlCommand).toHaveBeenCalled();
       expect(logger.info).toHaveBeenCalledWith("Dumping table: users");
-      expect(logger.info).toHaveBeenCalledWith("Table succesfully dumped");
+      expect(result).toBe(`${fakeFileConfig.schemaOutputDir}/users.sql`);
     });
 
-    it("should include data when dumping migration_history using MIGRATION_HISTORY_TABLE constant", async () => {
-      await schemaDumpService.dumpTable(
-        MIGRATION_HISTORY_TABLE,
-        fakeConfig.mainDatabaseConfig,
-        fakeConfig.fileConfig
-      );
+    it("should include data when dumping the migration_history table", async () => {
+      await schemaDumpService.dumpTable(MIGRATION_HISTORY_TABLE, fakeDbConfig, fakeFileConfig);
 
-      // - [0][0] -- access the first call of the mock, access the first argument of call
-      // - can check if the command string was build correctly without triggering the
-      const cmd = (runCommand as any).mock.calls[0][0];
-      expect(cmd).not.toContain("--no-data"); // should not contain --no-data
+      const cmd = (runMySqlCommand as any).mock.calls[0][0];
+      expect(cmd).not.toContain("--no-data");
     });
 
-    it("should log error using ERROR_MESSAGES and throw if runCommand fails", async () => {
-      (runCommand as any).mockRejectedValueOnce(new Error("bad table"));
+    it("should exclude data for regular tables", async () => {
+        await schemaDumpService.dumpTable("users", fakeDbConfig, fakeFileConfig);
+  
+        const cmd = (runMySqlCommand as any).mock.calls[0][0];
+        expect(cmd).toContain("--no-data");
+    });
+
+    it("should log an error and throw if runCommand fails", async () => {
+      (runMySqlCommand as any).mockRejectedValueOnce(new Error("bad table"));
 
       await expect(
-        schemaDumpService.dumpTable("users", fakeConfig.mainDatabaseConfig, fakeConfig.fileConfig)
+        schemaDumpService.dumpTable("users", fakeDbConfig, fakeFileConfig)
       ).rejects.toThrow("bad table");
 
       expect(logger.error).toHaveBeenCalledWith(
         ERROR_MESSAGES.SCHEMA_DUMP.TABLE("users"),
         expect.any(Error)
       );
-    });
-
-    it("should throw and log generic table error message when table name is undefined", async () => {
-      (runCommand as any).mockRejectedValueOnce(new Error("bad table"));
-
-      // Simulate a scenario where table name might be undefined
-      const tableName = undefined as any;
-      await expect(
-        schemaDumpService.dumpTable(tableName, fakeConfig.mainDatabaseConfig, fakeConfig.fileConfig)
-      ).rejects.toThrow("bad table");
-
-      expect(logger.error).toHaveBeenCalledWith(
-        ERROR_MESSAGES.SCHEMA_DUMP.TABLE(tableName),
-        expect.any(Error)
-      );
-    });
-  });
-
-  describe("Constants Integration", () => {
-    it("should use MIGRATION_HISTORY_TABLE constant correctly", () => {
-      expect(MIGRATION_HISTORY_TABLE).toBe("migration_history");
-    });
-
-    it("should use ERROR_MESSAGES constants correctly", () => {
-      expect(ERROR_MESSAGES.SCHEMA_DUMP.BULK).toBe("Error while dumping schema");
-      expect(ERROR_MESSAGES.SCHEMA_DUMP.TABLE("test_table")).toBe("Error while dumping table: test_table");
-      expect(ERROR_MESSAGES.SCHEMA_DUMP.TABLE()).toBe("Error while dumping table");
-      expect(ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR).toBe("Stopping table dumping due to error");
-      expect(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES).toBe("Error while fetching tables");
     });
   });
 });
