@@ -60,7 +60,7 @@ export class MigrationService {
             let migHistoryExists: boolean = await this.checkMigrationHistoryExists(mainConnection);
 
             // checks if migration history table exists on main database nad dumps it with data
-            const migrationHistoryDumpPath = await this.handleMigrationHistory(mainConnection, this.config);
+            const migrationHistoryDumpPath = await this.handleMigrationHistory(mainConnection, this.config, migHistoryExists);
 
             // if the migration history exists on the main database, it retrieves the applied and unapplied migrations
             let migrationResult;
@@ -101,14 +101,14 @@ export class MigrationService {
     }
 
     /**
-     * Handles migration history table existence and dumping
+     * Checks if migration history table exists and dumps if exists on the main database
      */
-    private async handleMigrationHistory(connection: Connection, config: Config): Promise<string | undefined> {
-        // check if mig history table exists
-        const hasMigrationHistory = await this.databaseManager.tableExists(
-            connection,
-            MIGRATION_HISTORY_TABLE
-        );
+    private async handleMigrationHistory(connection: Connection, config: Config, migHistoryExists?: boolean): Promise<string | undefined> {
+        const hasMigrationHistory =
+            migHistoryExists !== undefined
+            ? migHistoryExists
+            : await this.databaseManager.tableExists(connection, MIGRATION_HISTORY_TABLE);
+
 
         if (!hasMigrationHistory) {
             logger.info('No migration history found. Will generate migration_history table on restore');
