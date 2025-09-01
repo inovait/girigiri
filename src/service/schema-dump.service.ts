@@ -1,4 +1,4 @@
-import { runCommand } from "../utils.ts";
+import { runMySqlCommand } from "../utils.ts";
 import type { DatabaseConfig } from "../interface/database-config.interface.ts";
 import type { FileConfig } from "../interface/file-config.interface.ts";
 import logger from "../logging/logger.ts";
@@ -15,7 +15,10 @@ export class SchemaDumpService {
     this.databaseManager = databaseManager;
   }
 
-  async dumpSchemaBulk(databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
+  /**
+   * Uses mysqldump command to dump specified database
+   */
+  async mySqlDump(databaseConfig: DatabaseConfig, fileConfig: FileConfig, fileName: string): Promise<string> {
     let args = [
       `-u${databaseConfig.user}`,
       `-h${databaseConfig.host}`,
@@ -35,12 +38,12 @@ export class SchemaDumpService {
       FileManager.makeDirectory(fileConfig.schemaOutputDir);
     }
 
-    const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/tmp_dump.sql`;
+    const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/${fileName}.sql`;
 
     try {
-      await runCommand(dumpCommand, databaseConfig.password)
+      await runMySqlCommand(dumpCommand, databaseConfig.password)
       logger.info('Schema succesfully dumped, returning temp file path')
-      return `${fileConfig.schemaOutputDir}/tmp_dump.sql`
+      return `${fileConfig.schemaOutputDir}/${fileName}.sql`
     } catch (err) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.BULK, err);
       throw err
@@ -74,6 +77,9 @@ export class SchemaDumpService {
     }
   }
 
+  /**
+   * Retrieves database tables
+   */
   private async getTables(databaseConfig: DatabaseConfig) {
     let mainConnection!: Connection;
     try {
@@ -90,11 +96,14 @@ export class SchemaDumpService {
     }
   }
 
+  /**
+   * Dumps database table
+   */
   public async dumpTable(table: string, config: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
     let args = [
-      `-u ${config.user}`,
-      `-h ${config.host}`,
-      `-P ${config.port}`,
+      `-u${config.user}`,
+      `-h${config.host}`,
+      `-P${config.port}`,
       '--no-data',
       '--compact',
       config.database,
@@ -110,7 +119,7 @@ export class SchemaDumpService {
 
     try {
       logger.info(`Dumping table: ${table}`)
-      await runCommand(dumpCommand,config.password)
+      await runMySqlCommand(dumpCommand,config.password)
       return `${fileConfig.schemaOutputDir}/${table}.sql`
     } catch (err) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.TABLE(table), err);
