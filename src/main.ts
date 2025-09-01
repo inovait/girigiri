@@ -5,6 +5,7 @@ import { SchemaDumpService } from "./service/schema-dump.service.ts";
 import { ConfigManager } from "./manager/config.manager.ts";
 import { DatabaseManager } from "./manager/database.manager.ts";
 import logger from "./logging/logger.ts";
+import { FileManager } from "./manager/file.manager.ts";
 
 const configManager = ConfigManager.getInstance();
 const databaseManager = new DatabaseManager();
@@ -51,6 +52,8 @@ program
   .action(() =>
     runCliAction(async () => {
       const config = configManager.getConfig();
+      // first remove the dump files - clean dump
+      FileManager.removeDirectory(config.fileConfig.schemaOutputDir)
       await schemaDumpService.dumpSchema(
         config.mainDatabaseConfig,
         config.fileConfig
