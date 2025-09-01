@@ -1,8 +1,8 @@
-// src/utils/getPaths.ts
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 import { exec } from 'child_process';
 import logger from "./logging/logger.ts";
+import { promisify } from 'util';
 
 export function getPaths(metaUrl: string) {
   const __filename = fileURLToPath(metaUrl);
@@ -17,7 +17,7 @@ export function getPaths(metaUrl: string) {
  * @param command The shell command to execute
  * @param mysqlPwd Pw passed to the command but not visible in CI
  */
-export function runCommand(
+export function runMySqlCommand(
     command: string,
     mysqlPwd?: string
 ): Promise<void> {
@@ -49,4 +49,11 @@ export function runCommand(
     });
 }
 
+
+
+const _execAsync = promisify(exec);
+export async function execAsync(command: string): Promise<{ stdout: string; stderr: string }> {
+  const { stdout, stderr } = await _execAsync(command);
+  return { stdout, stderr };
+}
 
