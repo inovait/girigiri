@@ -4,6 +4,6 @@ import type { FileConfig } from "./file-config.interface.ts";
 
 export interface Config {
     mainDatabaseConfig: DatabaseConfig
-    migrationDatabaseConfig: DatabaseConfig
+    tempDatabaseConfig: DatabaseConfig
     fileConfig: FileConfig
 }

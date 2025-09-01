@@ -10,6 +10,9 @@ export class DatabaseManager {
 
     constructor() { }
 
+    /**
+     * Connects to database
+     */
     async connect(databaseConfig: DatabaseConfig): Promise<Connection> {
         const maxRetries = DatabaseManager.DEFAULT_MAX_RETRIES;
         const retryDelay = DatabaseManager.DEFAULT_RETRY_DELAY_MS;
@@ -40,6 +43,9 @@ export class DatabaseManager {
         throw new Error(ERROR_MESSAGES.DATABASE.CONNECTION_UNEXPECTED);
     }
 
+    /**
+     * Creates database based on db name
+     */
     async createDatabase(connection: Connection, dbName?: string): Promise<void> {
         if (!dbName) {
             logger.error(ERROR_MESSAGES.DATABASE.NAME_REQUIRED);
@@ -100,7 +106,20 @@ export class DatabaseManager {
         }
     }
 
+    /**
+     * delay helper function
+     */
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+
+    /**
+     * Preprocesses sql file (text). 
+     */
+    public preprocessSqlFile(sql: string): string {
+        return sql
+             .replace(/^DELIMITER\s+.+$/gm, '')  // remove DELIMITER lines
+             .replace(/\/\/\s*$/gm, ';');     
+    }
+
 }

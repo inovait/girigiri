@@ -43,7 +43,7 @@ export class ConfigManager {
 
     public setMigrationDatabaseConfig(databaseConfig: DatabaseConfig): void {
         this.ensureConfigLoaded();
-        this.config!.migrationDatabaseConfig = databaseConfig;
+        this.config!.tempDatabaseConfig = databaseConfig;
     }
 
     private ensureConfigLoaded(): void {
@@ -55,7 +55,7 @@ export class ConfigManager {
     private loadConfiguration(): Config {
         try {
             return {
-                migrationDatabaseConfig: this.createMigrationDatabaseConfig(),
+                tempDatabaseConfig: this.createMigrationDatabaseConfig(),
                 mainDatabaseConfig: this.createMainDatabaseConfig(),
                 fileConfig: this.createFileConfig(),
             };
