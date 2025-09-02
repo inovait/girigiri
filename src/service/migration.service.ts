@@ -13,7 +13,8 @@ import { runMySqlCommand } from "../utils.ts";
 import { DOCKER_DOWN_COMMAND, DOCKER_UP_COMMAND, MAIN_DB_TMP, MIGRATION_HISTORY_TABLE } from "../constants/constants.ts";
 import { ERROR_MESSAGES } from "../constants/error-messages.ts";
 import { getPaths } from "../utils.ts";
-import { SchemaComparisonService } from "./schema-comparison.service.ts";
+import { SchemaComparisonService, type SchemaComparison } from "./schema-comparison.service.ts";
+
 
 interface MigrationResult {
     unappliedMigrations: Set<string>;
@@ -48,11 +49,14 @@ export class MigrationService {
         let tempDatabaseConfig: DatabaseConfig = this.config.tempDatabaseConfig;
         
         // SoT
-        const sourceControlSchemaConfig: FileConfig = {...this.config.fileConfig};
+        const snapshotDir = path.join(this.__dirname, '..', '..', this.config.fileConfig.snapshotDir);       
+        const sourceControlSchemaConfig: FileConfig = {...this.config.fileConfig, snapshotDir: snapshotDir};
         
         // tmp
         const tempSchemaDir = path.join(this.__dirname, '..', '..', 'tmp', `schema-run-${Date.now()}`);
         const tempSchemaConfig: FileConfig = { ...this.config.fileConfig,schemaOutputDir: tempSchemaDir};
+        
+        
 
         try {
             // connects to the main database
@@ -88,9 +92,9 @@ export class MigrationService {
             await this.migrate(tempConnection, tempDatabaseConfig, tempSchemaConfig);
             // dumps the tmp database schema
             logger.info(`Dumping temporary database schema to ${tempSchemaDir}`);
-            await this.dumpSchemaTableByTable(tempDatabaseConfig, tempSchemaConfig);
+            await this.dumpSchema(tempDatabaseConfig, tempSchemaConfig, "temp_db")
             // compares the main and temp database schema
-            await this.compareSchemas(sourceControlSchemaConfig, tempSchemaConfig)
+            await this.compareSchemas(sourceControlSchemaConfig.snapshotDir, tempSchemaConfig.schemaOutputDir)
             logger.info('Check migrations completed successfully');
         } catch (error) {
             logger.error(ERROR_MESSAGES.MIGRATION.VALIDATION, error);
@@ -477,14 +481,16 @@ export class MigrationService {
     /**
      *  Compare the main and temp schema and output a formatted result
      */
-    private async compareSchemas(sourceConfig: FileConfig, tempConfig: FileConfig) {
+    private async compareSchemas(schemaSnapshot: string, tempSnapshot: string) {
         const scs = new SchemaComparisonService();
-        const identical: boolean = await scs.compareSchemasBash(sourceConfig, tempConfig);
-        const formattedResult: string = scs.formatResult(identical)
-        if(!identical) {
+        const comparison: SchemaComparison = await scs.compareSchemasBash(schemaSnapshot, tempSnapshot);
+        const formattedResult: string = scs.formatResult(comparison.isIdentical)
+        logger.info(comparison.diff)
+        if(!comparison.isIdentical) {
             logger.error(formattedResult)
             throw new Error(formattedResult)
         }
+        
         logger.info(formattedResult)
     }
 }

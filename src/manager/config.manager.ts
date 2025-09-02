@@ -96,6 +96,7 @@ export class ConfigManager {
         return {
             schemaOutputDir: this.getEnvVar('SCHEMA_OUTPUT_DIR', 'dist/schema'),
             migrationsDir: this.getEnvVar('MIGRATIONS_DIR', 'dist/migrations'),
+            snapshotDir: this.getEnvVar('SCHEMA_SNAPSHOT_DIR', 'dist/snapshot')
         };
     }
 

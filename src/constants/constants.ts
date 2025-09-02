@@ -4,3 +4,5 @@ export const CONTAINER_SERVICE = 'mysqldb' // see docker compose.yml as a refere
 export const DOCKER_UP_COMMAND = 'docker compose --env-file .env up -d --build mysqldb';
 export const DOCKER_DOWN_COMMAND = 'docker compose --env-file .env rm -sfv mysqldb';
 export const MAIN_DB_TMP = 'main_tmp'
+export const SNAPSHOT_NORMALIZED = 'snapshot_normalized.sql'
+export const TEMP_NORMALIZED = 'temp_normalized.sql'
