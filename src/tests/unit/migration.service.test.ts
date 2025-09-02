@@ -46,7 +46,7 @@ const migrationDatabaseConfig: DatabaseConfig = {
     host: "localhost", port: 3306, user: "root", password: "pw", database: "mig_db",
     waitForConnections: true, multipleStatements: true, connectionLimit: 10, queueLimit: 0
 };
-const fileConfig: FileConfig = { migrationsDir: "migrations", schemaOutputDir: "schemas" };
+const fileConfig: FileConfig = { migrationsDir: "migrations", schemaOutputDir: "schemas", snapshotDir: "/snapshot" };
 
 const mockSchemaDumpService = {
     mySqlDump: vi.fn(() => Promise.resolve('dump/path/schema.sql')),
@@ -99,7 +99,7 @@ describe("MigrationService", () => {
 
     describe("checkMigrations", () => {
         it("should run the full validation process successfully", async () => {    
-            vi.spyOn(mockSchemaComparisonService as any, 'compareSchemasBash').mockResolvedValue(true);
+            vi.spyOn(mockSchemaComparisonService as any, 'compareSchemasBash').mockResolvedValue({isIdentical: true, diff: ''});
             await expect(migrationService.checkMigrations()).resolves.toBeUndefined();
 
             expect(mockSchemaDumpService.mySqlDump).toHaveBeenCalledWith(mainDatabaseConfig, fileConfig, MAIN_DB_TMP);
