@@ -336,11 +336,8 @@ export class MigrationService {
     ): Promise<void> {
         try {
             // checks if the migration table exists
-            let migHistory = await this.checkMigrationHistoryExists(connection)
-            if (!migHistory) {
-                throw Error("Migration history doesn't exist. Cannot initiate migrations")
-            }
-                
+            await this.validateMigrationsTable(connection)
+            
             const { unappliedMigrations, appliedMigrations } = await this.getUnappliedAndAppliedMigrations(connection);
             if (unappliedMigrations.size > 0) {
                 appliedMigrations.forEach(migrationName => {
@@ -490,7 +487,4 @@ export class MigrationService {
         }
         logger.info(formattedResult)
     }
-            
-
-
 }
