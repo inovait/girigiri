@@ -40,5 +40,6 @@ export const ERROR_MESSAGES = {
             table ? `Error while dumping table: ${table}` : "Error while dumping table",
         STOP_DUE_TO_ERROR: "Stopping table dumping due to error",
         FETCH_TABLES: "Error while fetching tables",
+        FETCH_SCHEMA_OBJECTS: (type?: string) => `Error while fetching ${type}'s`
     }
 } as const;
