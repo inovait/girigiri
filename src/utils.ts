@@ -19,13 +19,14 @@ export function getPaths(metaUrl: string) {
  */
 export function runMySqlCommand(
     command: string,
-    mysqlPwd?: string
+    mysqlPwd?: string,
+    prependMkdir: boolean = true
 ): Promise<void> {
     return new Promise((resolve, reject) => {
 
        // detect redirection with ">"
         const redirectMatch = command.match(/>\s*([^\s]+)/);
-        if (redirectMatch) {
+        if (redirectMatch && prependMkdir) {
             const outputFile = redirectMatch[1];
             const dir = path.dirname(outputFile);
 
