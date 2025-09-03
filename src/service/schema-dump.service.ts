@@ -170,24 +170,7 @@ export class SchemaDumpService {
     }
   }
 
-  private async dumpSchemaObject(objectName: string, objectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
-    try {
-      switch (objectType) {
-        case SCHEMA_OBJECT_TYPE.PROCEDURE:
-        case SCHEMA_OBJECT_TYPE.FUNCTION:
-          return await this.dumpRoutine(objectName, objectType, databaseConfig, fileConfig)
-        case SCHEMA_OBJECT_TYPE.EVENT:
-        case SCHEMA_OBJECT_TYPE.TRIGGER:
-        case SCHEMA_OBJECT_TYPE.VIEW:
-          return await this.dumpNonRoutine(objectName, objectType, databaseConfig, fileConfig)
-        default:
-          throw new Error(`Unsupported schema object type: ${objectType}`)
-      }
-    } catch (err) {
-      logger.error(err)
-      throw err;
-    }
-  }
+
 
   private async dumpNonRoutine(objectName: string, objectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
     const outputPath = `${fileConfig.schemaOutputDir}/${objectName}.sql`;
@@ -207,27 +190,6 @@ export class SchemaDumpService {
     logger.info(`Dumping ${objectType.toLowerCase()}: ${objectName}`);
     await runMySqlCommand(dumpCmd, databaseConfig.password);
     return outputPath;
-  }
-
-  private async dumpRoutine(objectName: string, objectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<string> {
-    const outputPath = `${fileConfig.schemaOutputDir}/${objectName}.sql`;
-    const args = [
-      `-u${databaseConfig.user}`,
-      `-h${databaseConfig.host}`,
-      `-P${databaseConfig.port}`,
-      `-p${databaseConfig.password}`,
-      '--no-create-info',
-      '--no-create-db',
-      '--no-data',
-      '--skip-triggers',
-      '--routines',
-      databaseConfig.database
-    ]
-
-    let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
-    const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/${objectName}.sql`;
-    await runMySqlCommand(dumpCommand, databaseConfig.database)
-    return outputPath
   }
 
   /**
