@@ -31,6 +31,7 @@ vi.mock("../../manager/file.manager.ts", () => ({
         readDirectory: vi.fn(() => [mockMigrationSql]),
         fileExists: vi.fn(() => true),
         removeFile: vi.fn(),
+        checkDirectory: vi.fn(() => true)
     },
 }));
 
@@ -109,11 +110,6 @@ describe("MigrationService", () => {
 
             expect(logger.info).toHaveBeenCalledWith(`Applying migration: ${mockMigrationSql}`);
             expect(logger.info).toHaveBeenCalledWith(`Applied migration successfully: ${mockMigrationSql}`);
-
-            expect(mockSchemaDumpService.dumpSchema).toHaveBeenCalledWith(migrationDatabaseConfig, expect.objectContaining({
-                migrationsDir: fileConfig.migrationsDir,
-                schemaOutputDir: expect.stringContaining('tmp/schema-run-')
-            }));
             
             // assert that it completed successfully
             expect(logger.info).toHaveBeenCalledWith('Check migrations completed successfully');

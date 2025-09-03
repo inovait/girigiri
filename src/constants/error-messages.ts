@@ -20,6 +20,8 @@ export const ERROR_MESSAGES = {
         READ: "Error reading file",
         WRITE: "Error writing file",
         DELETE: "Error deleting file",
+        FILE_EXISTS: (file: string ) => `Failed to read file: ${file}`,
+        DIRECTORY: (directory: string) => `Failed to read directory: ${directory}`
     },
     MIGRATION: {
         VALIDATION: "Error while validating migrations",

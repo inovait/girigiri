@@ -482,6 +482,20 @@ export class MigrationService {
      *  Compare the main and temp schema and output a formatted result
      */
     private async compareSchemas(schemaSnapshot: string, tempSnapshot: string) {
+        let snapshotExists = FileManager.checkDirectory(schemaSnapshot)
+        let tempExists = FileManager.checkDirectory(tempSnapshot)
+        
+        if(!snapshotExists) {
+            logger.error("No snapshot folder found. Exiting application")
+            throw new Error(ERROR_MESSAGES.FILE.DIRECTORY(schemaSnapshot))
+        }
+
+        if(!tempExists) {
+            logger.error("No temp folder found. Exiting application")
+            throw new Error(ERROR_MESSAGES.FILE.DIRECTORY(tempSnapshot))
+        }
+
+        // check if the schemas match
         const scs = new SchemaComparisonService();
         const comparison: SchemaComparison = await scs.compareSchemasBash(schemaSnapshot, tempSnapshot);
         const formattedResult: string = scs.formatResult(comparison.isIdentical)
