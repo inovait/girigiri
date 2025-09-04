@@ -16,6 +16,7 @@ Create a .env file:
 Copy the .env.example file and rename it to local.env. Fill in your environment-specific variables. (for local development)
 
 ```sh
+# the target db config
 [DB_VALUES]
 DB_HOST=dbHost
 DB_PORT=dbPort
@@ -23,16 +24,20 @@ DB_USER=dbUser
 DB_PASSWORD=dbPassword
 DB_NAME=dbName
 
+
+# the temp database config
 DB_MIGRATION_HOST=dbMigHost
 DB_MIGRATION_PORT=dbMigPort
 DB_MIGRATION_USER=dbMigUser
 DB_MIGRATION_PASSWORD=dbMigPassword
 DB_MIGRATION_NAME=dbMigName
 
+DB_CONTAINER_PORT=4401 # container port of the throwaway database - see docker compose
+
 [SQL_DUMP]
-NO_COMMENTS=false # with or without comments
-NO_TRAIL=false # with or without table options
+MIGRATIONS_DIR=migrations # migration file dir
 SCHEMA_OUTPUT_DIR=dir # output directory for schema dump 
+SCHEMA_SNAPSHOT_DIR=snapshot # directory of the db snapshot - used by check:migrations
 ```
 
 ## Installation
@@ -89,10 +94,13 @@ To use tests run:
 ```
 
 You will need to setup a .env.integration file and have a working database instance:
-The lower part is needed for the tests to grab the appropriate files
+The lower part is needed for the tests to grab the appropriate files (currently not working, grabbing .env file)
 ```sh
-    SCHEMA_OUTPUT_DIR=src/tests/integration/fixtures
-    MIGRATIONS_DIR=src/tests/integration/fixtures/migrations
+    DB_HOST=dbHost
+    DB_PORT=dbPort
+    DB_USER=dbUser
+    DB_PASSWORD=dbPassword
+    DB_NAME=dbName
 ```
 
 
@@ -113,3 +121,24 @@ To generate a diff the migrations would create in a log file run;
     npm run check:migrations:diff
 ```
 
+The consumer should have a package.json in its root, it should look like this 
+```sh
+{
+  "name": "my-dotnet-client",
+  "version": "1.0.0",
+    "scripts": {
+    "copy-env": "cp .env node_modules/girigiri/.env",
+    "prepare:tool": "npm run build:tool && npm run copy-env",
+    "build:tool": "npm run build --prefix node_modules/girigiri",
+    "dump:schema": "node node_modules/girigiri/dist/main.js dump:schema",
+    "check:migrations": "node node_modules/girigiri/dist/main.js check:migrations",
+    "migrate": "node node_modules/girigiri/dist/main.js migrate"
+  },
+  "dependencies": {
+    "girigiri": "git+https://github.com/inovait/girigiri.git#main" - or a branch
+  },
+  "devDependencies": {
+    "cross-env": "^10.0.0",
+    "tsx": "^4.20.5"
+  }
+}
