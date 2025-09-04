@@ -87,7 +87,7 @@ export class SchemaDumpService {
           await this.dumpDbObject(objectName, type, databaseConfig, fileConfig);
         } catch (err) {
           logger.error(`Failed to dump ${type} "${objectName}"`, err);
-          throw new Error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(type))
+          throw new Error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(type, err))
         }
       }
     }
@@ -138,7 +138,7 @@ export class SchemaDumpService {
           break;
         case SCHEMA_OBJECT_TYPE.FUNCTION: sql = SELECT_FUNCTIONS(databaseConfig.database!)
           break;
-        default: throw new Error("something something")
+        default: throw new Error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(routine))
       }
 
       const [dbOjects]: any[] = await mainConnection.query(sql)
@@ -168,28 +168,6 @@ export class SchemaDumpService {
     } finally {
       mainConnection?.end();
     }
-  }
-
-
-
-  private async dumpNonRoutine(objectName: string, objectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
-    const outputPath = `${fileConfig.schemaOutputDir}/${objectName}.sql`;
-    const args = [
-      `-u${databaseConfig.user}`,
-      `-h${databaseConfig.host}`,
-      `-P${databaseConfig.port}`,
-    ];
-
-
-    if (objectType === SCHEMA_OBJECT_TYPE.TRIGGER) args.push('--triggers');
-    if (objectType === SCHEMA_OBJECT_TYPE.EVENT) args.push('--events');
-    args.push(databaseConfig.database!);
-    args.push(objectName)
-
-    const dumpCmd = `mysqldump ${args.join(' ')} > ${outputPath}`;
-    logger.info(`Dumping ${objectType.toLowerCase()}: ${objectName}`);
-    await runMySqlCommand(dumpCmd, databaseConfig.password);
-    return outputPath;
   }
 
   /**
