@@ -101,7 +101,7 @@ export class MigrationService {
             logger.error(ERROR_MESSAGES.MIGRATION.VALIDATION, error);
             throw error;
         } finally {
-            await this.cleanup(mainConnection!, tempSchemaDir, schemaDumpPath!);
+            await this.cleanup(mainConnection!, tempSchemaDir, schemaDumpPath!, composeFile, envFile);
         }
     }
 
@@ -299,7 +299,7 @@ export class MigrationService {
     /**
      * Cleans up temporary database and connections/docker container
      */
-    private async cleanup(connection: Connection,tempDirectoryPath: string, schemaDumpPath: string): Promise<void> {
+    private async cleanup(connection: Connection,tempDirectoryPath: string, schemaDumpPath: string, composeFile: string, envFile: string): Promise<void> {
         connection.end()
         // remove temp db files
         try {
@@ -322,10 +322,9 @@ export class MigrationService {
             logger.warn(`Could not remove temporary directory: ${schemaDumpPath}`, error);
         }
 
-        logger.info('Winding down docker service...');
-        
         try {
-            await runMySqlCommand(DOCKER_DOWN_COMMAND("",""));
+            logger.info('Winding down docker service...');
+            await runMySqlCommand(DOCKER_DOWN_COMMAND(composeFile, envFile));
         } catch (error: any) {
             logger.error('Failed to wind down docker service.', error);
         }
