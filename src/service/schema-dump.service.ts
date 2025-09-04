@@ -1,14 +1,14 @@
-import { runMySqlCommand } from "../utils.ts";
-import type { DatabaseConfig } from "../interface/database-config.interface.ts";
-import type { FileConfig } from "../interface/file-config.interface.ts";
-import logger from "../logging/logger.ts";
-import { DatabaseManager } from "../manager/database.manager.ts";
-import { FileManager } from "../manager/file.manager.ts";
-import { MIGRATION_HISTORY_TABLE, SELECT_EVENTS, SELECT_FUNCTIONS, SELECT_PROCEDURES, SELECT_TRIGGERS, SELECT_VIEWS } from "../constants/constants.ts";
-import { ERROR_MESSAGES } from "../constants/error-messages.ts";
+import { runMySqlCommand } from "../utils.js";
+import type { DatabaseConfig } from "../interface/database-config.interface.js";
+import type { FileConfig } from "../interface/file-config.interface.js";
+import logger from "../logging/logger.js";
+import { DatabaseManager } from "../manager/database.manager.js";
+import { FileManager } from "../manager/file.manager.js";
+import { MIGRATION_HISTORY_TABLE, SELECT_EVENTS, SELECT_FUNCTIONS, SELECT_PROCEDURES, SELECT_TRIGGERS, SELECT_VIEWS } from "../constants/constants.js";
+import { ERROR_MESSAGES } from "../constants/error-messages.js";
 import type { Connection } from "mysql2/promise";
-import { SCHEMA_OBJECT_TYPE } from "../enum/schema-object-type.enum.ts";
-import type { SchemaObjectType } from "../enum/schema-object-type.enum.ts";
+import { SCHEMA_OBJECT_TYPE } from "../enum/schema-object-type.enum.js";
+import type { SchemaObjectType } from "../enum/schema-object-type.enum.js";
 import path from "path";
 
 

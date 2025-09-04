@@ -1,14 +1,15 @@
 {
-  "include": ["src/**/*"],
-  "exclude": ["**/*.spec.ts", "**/*.test.ts"],
   "compilerOptions": {
-    "baseUrl": "./src",
-    "module": "nodenext",
-    "target": "es2020",
-    "moduleResolution": "nodenext",
-    "esModuleInterop": true,
+    "target": "ES2020",
+    "module": "nodenext",           
+    "moduleResolution": "nodenext",  
+    "outDir": "dist",                
+    "rootDir": "src",                
     "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true
-  }
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true              
+  },
+  "include": ["src/**/*"],
+  "exclude": ["**/*.spec.ts", "**/*.test.ts"]
 }

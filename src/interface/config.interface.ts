@@ -1,6 +1,6 @@
 
-import type { DatabaseConfig } from "./database-config.interface.ts";
-import type { FileConfig } from "./file-config.interface.ts";
+import type { DatabaseConfig } from "./database-config.interface.js";
+import type { FileConfig } from "./file-config.interface.js";
 
 export interface Config {
     mainDatabaseConfig: DatabaseConfig

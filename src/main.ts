@@ -1,11 +1,11 @@
 // src/main.ts
 import { Command } from "commander";
-import { MigrationService } from "./service/migration.service.ts";
-import { SchemaDumpService } from "./service/schema-dump.service.ts";
-import { ConfigManager } from "./manager/config.manager.ts";
-import { DatabaseManager } from "./manager/database.manager.ts";
-import logger from "./logging/logger.ts";
-import { FileManager } from "./manager/file.manager.ts";
+import { MigrationService } from "./service/migration.service.js";
+import { SchemaDumpService } from "./service/schema-dump.service.js";
+import { ConfigManager } from "./manager/config.manager.js";
+import { DatabaseManager } from "./manager/database.manager.js";
+import logger from "./logging/logger.js";
+import { FileManager } from "./manager/file.manager.js";
 
 const configManager = ConfigManager.getInstance();
 const databaseManager = new DatabaseManager();

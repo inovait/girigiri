@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 import { exec } from 'child_process';
-import logger from "./logging/logger.ts";
+import logger from "./logging/logger.js";
 import { promisify } from 'util';
 
 export function getPaths(metaUrl: string) {

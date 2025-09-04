@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
-import type { Config } from "../interface/config.interface.ts";
-import type { DatabaseConfig } from "../interface/database-config.interface.ts";
-import type { FileConfig } from "../interface/file-config.interface.ts";
-import { ERROR_MESSAGES } from "../constants/error-messages.ts";
+import type { Config } from "../interface/config.interface.js";
+import type { DatabaseConfig } from "../interface/database-config.interface.js";
+import type { FileConfig } from "../interface/file-config.interface.js";
+import { ERROR_MESSAGES } from "../constants/error-messages.js";
 
 dotenv.config();
 

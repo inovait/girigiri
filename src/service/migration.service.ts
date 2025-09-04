@@ -1,19 +1,19 @@
-import { ConfigManager } from "../manager/config.manager.ts";
-import logger from "../logging/logger.ts";
-import { DatabaseManager } from "../manager/database.manager.ts";
+import { ConfigManager } from "../manager/config.manager.js";
+import logger from "../logging/logger.js";
+import { DatabaseManager } from "../manager/database.manager.js";
 import type { Connection } from 'mysql2/promise';
-import type { MigrationRow } from "../interface/migration.row.interface.ts";
-import { FileManager } from "../manager/file.manager.ts";
+import type { MigrationRow } from "../interface/migration.row.interface.js";
+import { FileManager } from "../manager/file.manager.js";
 import path from "path";
-import { SchemaDumpService } from "./schema-dump.service.ts";
-import type { Config } from "interface/config.interface.ts";
-import type { FileConfig } from "interface/file-config.interface.ts";
-import type { DatabaseConfig } from "interface/database-config.interface.ts";
-import { runMySqlCommand } from "../utils.ts";
-import { DOCKER_DOWN_COMMAND, DOCKER_UP_COMMAND, MAIN_DB_TMP, MIGRATION_HISTORY_TABLE } from "../constants/constants.ts";
-import { ERROR_MESSAGES } from "../constants/error-messages.ts";
-import { getPaths } from "../utils.ts";
-import { SchemaComparisonService, type SchemaComparison } from "./schema-comparison.service.ts";
+import { SchemaDumpService } from "./schema-dump.service.js";
+import type { Config } from "../interface/config.interface.js";
+import type { FileConfig } from "../interface/file-config.interface.js";
+import type { DatabaseConfig } from "../interface/database-config.interface.js";
+import { runMySqlCommand } from "../utils.js";
+import { DOCKER_DOWN_COMMAND, DOCKER_UP_COMMAND, MAIN_DB_TMP, MIGRATION_HISTORY_TABLE } from "../constants/constants.js";
+import { ERROR_MESSAGES } from "../constants/error-messages.js";
+import { getPaths } from "../utils.js";
+import { SchemaComparisonService, type SchemaComparison } from "./schema-comparison.service.js";
 
 
 interface MigrationResult {

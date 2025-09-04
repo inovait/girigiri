@@ -1,6 +1,6 @@
 import * as fs from "fs";
-import { ERROR_MESSAGES } from "../constants/error-messages.ts";
-import logger from "../logging/logger.ts";
+import { ERROR_MESSAGES } from "../constants/error-messages.js";
+import logger from "../logging/logger.js";
 
 export const FileManager = {
   checkDirectory(directory_path: string) {

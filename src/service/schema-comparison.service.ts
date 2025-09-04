@@ -1,7 +1,7 @@
-import { MAIN_DB_TMP, MIGRATION_HISTORY_TABLE, SNAPSHOT_NORMALIZED, TEMP_NORMALIZED } from '../constants/constants.ts';
-import { execAsync } from '../utils.ts';
+import { MAIN_DB_TMP, MIGRATION_HISTORY_TABLE, SNAPSHOT_NORMALIZED, TEMP_NORMALIZED } from '../constants/constants.js';
+import { execAsync } from '../utils.js';
 import * as path from 'path';
-import { FileManager } from '../manager/file.manager.ts';
+import { FileManager } from '../manager/file.manager.js';
 
 export interface SchemaComparison {
   isIdentical: boolean;

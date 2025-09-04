@@ -1,8 +1,8 @@
 import { createConnection } from 'mysql2/promise';
 import type { Connection, RowDataPacket } from 'mysql2/promise';
-import type { DatabaseConfig } from '../interface/database-config.interface.ts';
-import { ERROR_MESSAGES } from '../constants/error-messages.ts';
-import logger from '../logging/logger.ts';
+import type { DatabaseConfig } from '../interface/database-config.interface.js';
+import { ERROR_MESSAGES } from '../constants/error-messages.js';
+import logger from '../logging/logger.js';
 
 export class DatabaseManager {
     private static readonly DEFAULT_MAX_RETRIES = 5;

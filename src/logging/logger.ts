@@ -1,6 +1,6 @@
 import { pino } from 'pino';
 import path from 'path';
-import { getPaths } from '../utils.ts';
+import { getPaths } from '../utils.js';
 
 const { __dirname } = getPaths(import.meta.url);
 
