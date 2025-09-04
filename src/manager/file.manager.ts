@@ -14,7 +14,7 @@ export const FileManager = {
         return false;
       }
       return true;
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`Error while checking directory ${directory_path}: ${error}`)
       throw new Error(`Error checking directory ${directory_path}: ${error}`);
     }
@@ -22,7 +22,7 @@ export const FileManager = {
   removeDirectory(directory_path: string) {
     try {
       fs.rmSync(directory_path, { recursive: true, force: true });
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Error removing directory ${directory_path}: ${error}`);
     }
       
@@ -34,7 +34,7 @@ export const FileManager = {
 
     try {
       return fs.mkdirSync(directory_path, { recursive: true });
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Error creating directory ${directory_path}: ${error}`);
     }
   },
@@ -46,7 +46,7 @@ export const FileManager = {
 
     try {
       return fs.readdirSync(directory_path);
-    } catch (error) {
+    } catch (error: any) {
       logger.error(ERROR_MESSAGES.FILE.READ, error);
       throw new Error(`Error reading directory ${directory_path}: ${error}`);
     }
@@ -59,7 +59,7 @@ export const FileManager = {
 
     try {
       return fs.readFileSync(file_path, "utf-8");
-    } catch (error) {
+    } catch (error: any) {
       logger.error(ERROR_MESSAGES.FILE.READ, error);
       throw new Error(`Error reading file ${file_path}: ${error}`);
     }
@@ -72,7 +72,7 @@ export const FileManager = {
 
     try {
       fs.writeFileSync(output_path, file_content);
-    } catch (error) {
+    } catch (error: any) {
       logger.error(ERROR_MESSAGES.FILE.WRITE, error);
       throw new Error(`Error writing file ${output_path}: ${error}`);
     }
@@ -107,7 +107,7 @@ export const FileManager = {
 
     try {
       return fs.existsSync(file_path) && fs.statSync(file_path).isFile();
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`Error checking file existence ${file_path}: ${error}`);
       return false;
     }

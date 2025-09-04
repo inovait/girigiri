@@ -59,7 +59,7 @@ export class ConfigManager {
                 mainDatabaseConfig: this.createMainDatabaseConfig(),
                 fileConfig: this.createFileConfig(),
             };
-        } catch (error) {
+        } catch (error: any) {
             throw new Error(ERROR_MESSAGES.CONFIG.LOAD);
         }
     }

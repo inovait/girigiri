@@ -21,7 +21,7 @@ async function runCliAction(
     await action();
     logger.info(successMessage);
     process.exit(0);
-  } catch (err) {
+  } catch (err: any) {
     const errorMessage = err instanceof Error ? err.stack || err.message : String(err);
     //logger.error(`Action failed:\n${errorMessage}`);
     process.exit(1); 

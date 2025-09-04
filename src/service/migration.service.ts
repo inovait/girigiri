@@ -56,7 +56,8 @@ export class MigrationService {
         const tempSchemaDir = path.join(this.__dirname, '..', '..', 'tmp', `schema-run-${Date.now()}`);
         const tempSchemaConfig: FileConfig = { ...this.config.fileConfig,schemaOutputDir: tempSchemaDir};
         
-        
+        const composeFile = path.join(this.__dirname, '..', '..', 'docker-compose.yml')
+        const envFile = path.join(this.__dirname, '..', '..', '.env')
 
         try {
             // connects to the main database
@@ -80,7 +81,7 @@ export class MigrationService {
 
             logger.info("Unapplied migrations found. Setting up temporary database...");
             logger.info('Winding up docker service')
-            await runMySqlCommand(DOCKER_UP_COMMAND)
+            await runMySqlCommand(DOCKER_UP_COMMAND(composeFile, envFile))
 
             // dumps the whole main database WITHOUT data
             schemaDumpPath = await this.dumpSchema(mainDatabaseConfig, sourceControlSchemaConfig, MAIN_DB_TMP)
@@ -96,7 +97,7 @@ export class MigrationService {
             // compares the main and temp database schema
             await this.compareSchemas(sourceControlSchemaConfig.snapshotDir, tempSchemaConfig.schemaOutputDir)
             logger.info('Check migrations completed successfully');
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.MIGRATION.VALIDATION, error);
             throw error;
         } finally {
@@ -166,7 +167,7 @@ export class MigrationService {
         try {
             logger.info(`Creating temporary database: ${databaseConfig.database}`);
             await this.databaseManager.createDatabase(connection, databaseConfig.database!);
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.DATABASE.CREATE, error);
             throw error;
         } finally {
@@ -193,7 +194,7 @@ export class MigrationService {
             await this.executeInsertStatements(databaseConfig, insertStatements);
             logger.info(`Restored ${insertStatements.length} migration history records`);
 
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.MIGRATION.RESTORE_HISTORY, error);
             throw error;
         }
@@ -215,7 +216,7 @@ export class MigrationService {
             }
 
             await connection.commit();
-        } catch (error) {
+        } catch (error: any) {
             await connection.rollback();
             throw error;
         } finally {
@@ -271,7 +272,7 @@ export class MigrationService {
             logger.info(`Executing SQL file: ${file}`);
             await runMySqlCommand(cmd, databaseConfig.password);
             logger.info('SQL file executed successfully');
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.MIGRATION.EXECUTE_SQL(file), error);
             throw error;
         }
@@ -307,7 +308,7 @@ export class MigrationService {
                 FileManager.removeDirectory(tempDirectoryPath)
                 logger.info('Temporary directory removed.');
             }
-        } catch (error) {
+        } catch (error: any) {
             logger.warn(`Could not remove temporary directory: ${tempDirectoryPath}`, error);
         }
 
@@ -317,15 +318,15 @@ export class MigrationService {
                 FileManager.removeDirectory(schemaDumpPath)
                 logger.info('Temporary directory removed.');
             }
-        } catch (error) {
+        } catch (error: any) {
             logger.warn(`Could not remove temporary directory: ${schemaDumpPath}`, error);
         }
 
         logger.info('Winding down docker service...');
         
         try {
-            await runMySqlCommand(DOCKER_DOWN_COMMAND);
-        } catch (error) {
+            await runMySqlCommand(DOCKER_DOWN_COMMAND("",""));
+        } catch (error: any) {
             logger.error('Failed to wind down docker service.', error);
         }
     }
@@ -393,7 +394,7 @@ export class MigrationService {
     private async checkMigrationHistoryExists(connection: Connection): Promise<boolean> {
         try {
             return await this.databaseManager.tableExists(connection, MIGRATION_HISTORY_TABLE);
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.TABLE.EXISTS(MIGRATION_HISTORY_TABLE), error);
             throw error;
         }
@@ -419,7 +420,7 @@ export class MigrationService {
                 "SELECT * FROM migration_history ORDER BY id ASC"
             );
             return rows;
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.MIGRATION.FETCH_APPLIED, error);
             throw error;
         }

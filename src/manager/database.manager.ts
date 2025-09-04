@@ -56,7 +56,7 @@ export class DatabaseManager {
             logger.info(`Creating database ${dbName}`);
             await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
             logger.info(`Database ${dbName} created successfully`);
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.DATABASE.CREATE, error);
             throw error;
         }

@@ -48,7 +48,7 @@ export class SchemaDumpService {
       await runMySqlCommand(dumpCommand, databaseConfig.password)
       logger.info('Schema succesfully dumped, returning temp file path')
       return `${fileConfig.schemaOutputDir}/${fileName}.sql`
-    } catch (err) {
+    } catch (err: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.BULK, err);
       throw err
     }
@@ -85,7 +85,7 @@ export class SchemaDumpService {
       for (const objectName of data) {
         try {
           await this.dumpDbObject(objectName, type, databaseConfig, fileConfig);
-        } catch (err) {
+        } catch (err: any ) {
           logger.error(`Failed to dump ${type} "${objectName}"`, err);
           throw new Error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(type, err))
         }
@@ -96,7 +96,7 @@ export class SchemaDumpService {
     for (let table of tables) {
       try {
         await this.dumpTable(table, databaseConfig, fileConfig)
-      } catch (err) {
+      } catch (err: any) {
         logger.error(ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR, err);
         throw err;
       }
@@ -143,7 +143,7 @@ export class SchemaDumpService {
 
       const [dbOjects]: any[] = await mainConnection.query(sql)
       return dbOjects.map((row: any) => { return row.name })
-    } catch (error) {
+    } catch (error: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(routine), error);
       throw error;
     } finally {
@@ -162,7 +162,7 @@ export class SchemaDumpService {
         `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [databaseConfig.database]);
 
       return tables.map((row: any) => { return row.TABLE_NAME })
-    } catch (error) {
+    } catch (error: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES, error);
       throw error;
     } finally {
@@ -195,7 +195,7 @@ export class SchemaDumpService {
       logger.info(`Dumping table: ${table}`)
       await runMySqlCommand(dumpCommand, config.password)
       return `${fileConfig.schemaOutputDir}/${table}.sql`
-    } catch (err) {
+    } catch (err: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.TABLE(table), err);
       throw err
     }
