@@ -453,7 +453,7 @@ export class MigrationService {
 
             try {
                 await connection.rollback();
-            } catch (rollbackError) {
+            } catch (rollbackError: any) {
                 logger.error(ERROR_MESSAGES.MIGRATION.ROLLBACK, rollbackError);
                 throw rollbackError;
             }

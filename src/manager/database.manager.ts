@@ -77,7 +77,7 @@ export class DatabaseManager {
             logger.info(`Dropping database ${dbName}`);
             await connection.query(`DROP DATABASE \`${dbName}\``);
             logger.info(`Database ${dbName} dropped successfully`);
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.DATABASE.DROP, error);
             throw error;
         }
@@ -100,7 +100,7 @@ export class DatabaseManager {
                 [tableName]
             );
             return rows.length > 0;
-        } catch (error) {
+        } catch (error: any) {
             logger.error(ERROR_MESSAGES.TABLE.EXISTS(tableName), error);
             throw error;
         }
