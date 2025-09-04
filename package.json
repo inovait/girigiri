@@ -6,9 +6,15 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "dump:schema": "tsx src/main.ts dump:schema",
-    "check:migrations": "tsx src/main.ts  check:migrations",
-    "migrate": "tsx src/main.ts migrate",
+    "prepare": "npm run build",
+
+    "dev:dump:schema": "tsx src/main.ts dump:schema",
+    "dev:check:migrations": "tsx src/main.ts check:migrations",
+    "dev:migrate": "tsx src/main.ts migrate",
+
+    "dump:schema": "node dist/main.js dump:schema",
+    "check:migrations": "node dist/main.js  check:migrations",
+    "migrate": "node dist/main.ts migrate",
     "test": "vitest --reporter verbose"
   },
   "repository": {
