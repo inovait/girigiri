@@ -28,6 +28,8 @@ export class SchemaDumpService {
       `-h${databaseConfig.host}`,
       `-P${databaseConfig.port}`,
       "--no-data",
+      "--skip-comments",
+      "--skip-extended-insert",
       "--single-transaction",
       "--routines",
       "--triggers",

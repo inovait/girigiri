@@ -3,6 +3,7 @@ import path, { dirname } from 'path';
 import { exec } from 'child_process';
 import logger from "./logging/logger.js";
 import { promisify } from 'util';
+import { FileManager } from './manager/file.manager.js';
 
 export function getPaths(metaUrl: string) {
   const __filename = fileURLToPath(metaUrl);
@@ -10,6 +11,23 @@ export function getPaths(metaUrl: string) {
   return { __filename, __dirname };
 }
 
+
+export function findHostRoot(startDir = __dirname) {
+       let currentDir = startDir;
+
+         while (true) {
+        if (FileManager.checkDirectory(path.join(currentDir, 'package.json'))) {
+            return currentDir; // found host project root
+        }
+
+        const parentDir = path.resolve(currentDir, '..');
+        if (parentDir === currentDir) {
+            // reached filesystem root
+            return null;
+        }
+        currentDir = parentDir;
+    }
+}
 
 
 /**

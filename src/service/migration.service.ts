@@ -9,7 +9,7 @@ import { SchemaDumpService } from "./schema-dump.service.js";
 import type { Config } from "../interface/config.interface.js";
 import type { FileConfig } from "../interface/file-config.interface.js";
 import type { DatabaseConfig } from "../interface/database-config.interface.js";
-import { runMySqlCommand } from "../utils.js";
+import { findHostRoot, runMySqlCommand } from "../utils.js";
 import { DOCKER_DOWN_COMMAND, DOCKER_UP_COMMAND, MAIN_DB_TMP, MIGRATION_HISTORY_TABLE } from "../constants/constants.js";
 import { ERROR_MESSAGES } from "../constants/error-messages.js";
 import { getPaths } from "../utils.js";
@@ -48,8 +48,11 @@ export class MigrationService {
         // tmp
         let tempDatabaseConfig: DatabaseConfig = this.config.tempDatabaseConfig;
         
+        let root = findHostRoot(this.__dirname)
+        //logger.info(root)
+
         // SoT
-        const snapshotDir = path.join(this.__dirname, '..', '..', this.config.fileConfig.snapshotDir);       
+        const snapshotDir = path.join(root!, this.config.fileConfig.snapshotDir);       
         const sourceControlSchemaConfig: FileConfig = {...this.config.fileConfig, snapshotDir: snapshotDir};
         
         // tmp

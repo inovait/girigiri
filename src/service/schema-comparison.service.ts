@@ -24,7 +24,7 @@ export class SchemaComparisonService {
     let content = FileManager.readFile(filePath);
 
     // remove comments and timestamps
-    content = content.replace(/^--.*$/gm, '');
+    //content = content.replace(/^--.*$/gm, '');
 
     // remove definer clauses
     content = content.replace(/DEFINER=`[^`]+`@`[^`]+`/g, '');
@@ -32,10 +32,14 @@ export class SchemaComparisonService {
     // remove auto increment values
     content = content.replace(/AUTO_INCREMENT=\d+/g, '');
 
-    
-    content = content.replace(
-    /CREATE TABLE `migration_history`[\s\S]*?;\n?/gi, '');
+    // remove engine
+    content = content.replace(/ENGINE=\w+(\s+DEFAULT CHARSET=[\w\d]+)?/gi, '');
 
+    // collate
+    content = content.replace(/\s+COLLATE=[\w\d_]+/gi, '');
+    
+    /*content = content.replace(
+    /CREATE TABLE `migration_history`[\s\S]*?;\n?/gi, '');*/
 
     // trim whitespace
     content = content.split('\n').map(line => line.trim()).join('\n');
@@ -93,12 +97,18 @@ export class SchemaComparisonService {
         normalizedTempPath
       ].join(' ');
 
-      const { stdout } = await execAsync(diffCommand).catch(err => ({ stdout: err?.stdout || '' }));
-
-      return {
-        isIdentical: !stdout.trim(),
-        diff: stdout.trim()
-      };
+      try {
+        await execAsync(diffCommand);
+        // Exit code 0 → files are identical
+        return { isIdentical: true, diff: '' };
+      } catch (err: any) {
+        if (err.code === 1) {
+            // Exit code 1 → files differ
+            return { isIdentical: false, diff: err.stdout || '' };
+        }
+        // Other exit codes → something went wrong
+        throw err;
+      }
     } catch (error: any) {
       throw new Error()
     } finally {
