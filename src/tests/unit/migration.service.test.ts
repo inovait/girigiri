@@ -7,7 +7,7 @@ import { FileManager } from "../../manager/file.manager.ts";
 import { SchemaDumpService } from "../../service/schema-dump.service.ts";
 import logger from "../../logging/logger.ts";
 import type { FileConfig } from "../../interface/file-config.interface.ts";
-import { runMySqlCommand } from "../../utils.ts";
+import { findHostRoot, runMySqlCommand } from "../../utils.ts";
 import { ERROR_MESSAGES } from "../../constants/error-messages.ts";
 import { MAIN_DB_TMP, MIGRATION_HISTORY_TABLE } from "../../constants/constants.ts";
 import { SchemaComparisonService } from "../../service/schema-comparison.service.ts";
@@ -18,7 +18,8 @@ const mockMigrationSql = "001_migration.sql";
 vi.mock("../../utils.ts", () => ({
     runMySqlCommand: vi.fn(() => Promise.resolve()),
     getPaths: vi.fn(() => ({ __dirname: "/fake/dir" })),
-    execAsync: vi.fn()
+    execAsync: vi.fn(),
+    findHostRoot: vi.fn(() => (""))
 }));
 
 vi.mock("../../logging/logger.ts", () => ({
