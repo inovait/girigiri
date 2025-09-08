@@ -11,12 +11,18 @@ export function getPaths(metaUrl: string) {
   return { __filename, __dirname };
 }
 
-
+/**
+ * Move up the directory tree and find the root lvl (where package.json and node modules resign)
+ * 
+ */
 export function findHostRoot(startDir = __dirname) {
-       let currentDir = startDir;
+    let currentDir = startDir;
 
-         while (true) {
-        if (FileManager.checkDirectory(path.join(currentDir, 'package.json'))) {
+    while (true) {
+        const hasPackageJson = FileManager.checkDirectory(path.join(currentDir, 'package.json'));
+        const hasNodeModules = FileManager.checkDirectory(path.join(currentDir, 'node_modules'));
+
+        if (hasPackageJson && hasNodeModules) {
             return currentDir; // found host project root
         }
 
@@ -25,6 +31,7 @@ export function findHostRoot(startDir = __dirname) {
             // reached filesystem root
             return null;
         }
+
         currentDir = parentDir;
     }
 }
