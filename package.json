@@ -7,11 +7,9 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-
     "dev:dump:schema": "tsx src/main.ts dump:schema",
     "dev:check:migrations": "tsx src/main.ts check:migrations",
     "dev:migrate": "tsx src/main.ts migrate",
-
     "dump:schema": "node dist/main.js dump:schema",
     "check:migrations": "node dist/main.js  check:migrations",
     "migrate": "node dist/main.ts migrate",
@@ -33,20 +31,17 @@
     "mysqldump": "^3.2.0",
     "pino": "^9.7.0",
     "pino-pretty": "^13.1.1",
-    "ts-node": "^10.9.2",
     "commander": "^14.0.0",
-    "vitest": "^3.2.4",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "vitest": "^3.2.4"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.3",
     "@types/node": "^24.2.0",
-    "commander": "^14.0.0",
     "cross-env": "^10.0.0",
     "dotenv-cli": "^10.0.0",
     "tsx": "^4.20.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }
