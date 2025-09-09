@@ -60,7 +60,7 @@ export class ConfigManager {
                 fileConfig: this.createFileConfig(),
             };
         } catch (error: any) {
-            throw new Error(ERROR_MESSAGES.CONFIG.LOAD);
+            throw new Error(`${ERROR_MESSAGES.CONFIG.LOAD}: ${error}`);
         }
     }
 
@@ -83,7 +83,7 @@ export class ConfigManager {
             user: this.getRequiredEnvVar('DB_USER'),
             password: this.getRequiredEnvVar('DB_PASSWORD'),
             host: this.getEnvVar('DB_HOST', 'localhost'),
-            port: this.getEnvVarAsNumber('DB_PORT', 5432), // Fixed: was using DB_MIGRATION_PORT
+            port: this.getEnvVarAsNumber('DB_PORT', 5432),
             database: this.getRequiredEnvVar('DB_NAME'),
             waitForConnections: true,
             multipleStatements: true,
