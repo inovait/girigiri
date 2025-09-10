@@ -76,7 +76,8 @@ describe("SchemaDumpService", () => {
 
       expect(FileManager.checkDirectory).toHaveBeenCalledWith(fakeFileConfig.schemaOutputDir);
       expect(FileManager.makeDirectory).toHaveBeenCalledWith(fakeFileConfig.schemaOutputDir);
-      expect(logger.info).toHaveBeenCalledWith("creating directory");
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("Creating directory"));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(fakeFileConfig.schemaOutputDir));
     });
 
     it("should log error and rethrow if runCommand fails", async () => {

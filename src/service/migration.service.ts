@@ -84,7 +84,7 @@ export class MigrationService {
 
             logger.info("Unapplied migrations found. Setting up temporary database...");
             logger.info('Winding up docker service')
-            await runMySqlCommand(DOCKER_UP_COMMAND(composeFile, envFile))
+            await runMySqlCommand(DOCKER_UP_COMMAND(composeFile))
 
             // dumps the whole main database WITHOUT data
             schemaDumpPath = await this.dumpSchema(mainDatabaseConfig, sourceControlSchemaConfig, MAIN_DB_TMP)
@@ -292,13 +292,6 @@ export class MigrationService {
         return schemaDumpPath;
     }
 
-     private async dumpSchemaTableByTable(databaseConfig: DatabaseConfig, fileConfig: FileConfig): Promise<void> {
-        logger.info(`Creating schema dump table-by-table in ${fileConfig.schemaOutputDir}`);
-        const schemaDumpService = new SchemaDumpService(this.databaseManager);
-        await schemaDumpService.dumpSchema(databaseConfig, fileConfig);
-        logger.info('Schema dump successfully completed');
-    }
-
     /**
      * Cleans up temporary database and connections/docker container
      */
@@ -327,7 +320,7 @@ export class MigrationService {
 
         try {
             logger.info('Winding down docker service...');
-            await runMySqlCommand(DOCKER_DOWN_COMMAND(composeFile, envFile));
+            await runMySqlCommand(DOCKER_DOWN_COMMAND(composeFile));
         } catch (error: any) {
             logger.error('Failed to wind down docker service.', error);
         }

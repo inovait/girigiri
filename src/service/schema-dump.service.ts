@@ -40,7 +40,7 @@ export class SchemaDumpService {
     let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
     // ensure directory exists
     if (!FileManager.checkDirectory(fileConfig.schemaOutputDir)) {
-      logger.info("creating directory")
+      logger.info(`Creating directory ${fileConfig.schemaOutputDir}`)
       FileManager.makeDirectory(fileConfig.schemaOutputDir);
     }
 
@@ -70,7 +70,7 @@ export class SchemaDumpService {
       logger.info(`Directory: ${outputDir} already exists`)
     }
 
-    // retrieve the schema tables+    
+    // retrieve the schema tables
     let tables = await this.getTables(databaseConfig)
 
     // retrieve schnema objects
@@ -108,7 +108,6 @@ export class SchemaDumpService {
   private async dumpDbObject(objectName: string, schemaObjectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
     const outputPath = path.join(`${fileConfig.schemaOutputDir}/${schemaObjectType}`, `${objectName}.sql`);
     FileManager.makeDirectory(`${fileConfig.schemaOutputDir}/${schemaObjectType}`)
-    
     const dumpCommand = [
       'mysql',
       `-u${databaseConfig.user}`,
@@ -161,7 +160,7 @@ export class SchemaDumpService {
     try {
       mainConnection = await this.databaseManager.connect(databaseConfig)
       const [tables]: any[] = await mainConnection.query(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [databaseConfig.database]);
+        `SELECT table_name as TABLE_NAME FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [databaseConfig.database]);
 
       return tables.map((row: any) => { return row.TABLE_NAME })
     } catch (error: any) {

@@ -25,13 +25,13 @@ export class DatabaseManager {
                 } else {
                     logger.info(`Connecting to database. Retry #${retries}`);
                 }
-
+                
                 return await createConnection(databaseConfig);
             } catch (error: any) {
                 retries++;
 
                 if (retries >= maxRetries) {
-                    logger.error(ERROR_MESSAGES.DATABASE.CONNECTION_MAX_RETRIES);
+                    logger.error(`${ERROR_MESSAGES.DATABASE.CONNECTION_MAX_RETRIES} : ${error.code}`);
                     throw error;
                 }
 
