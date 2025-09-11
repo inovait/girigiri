@@ -1,10 +1,9 @@
 services:
   mysqldb:
-    image: mysql:8.0
+    image: mysql:${DB_CONTAINER_MYSQL_VERSION:-5.7}
+    platform: ${DB_CONTAINER_PLATFORM:-linux/amd64}
     container_name: mysql-db
     restart: always
-    env_file:
-      - .env
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_MIGRATION_PASSWORD}
       MYSQL_DATABASE: ${DB_MIGRATION_NAME}
