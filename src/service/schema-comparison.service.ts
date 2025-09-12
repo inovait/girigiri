@@ -1,6 +1,5 @@
 import { MAIN_DB_TMP, MIGRATION_HISTORY_TABLE, SNAPSHOT_NORMALIZED, TEMP_NORMALIZED } from '../constants/constants.js';
 import { execAsync } from '../utils.js';
-import * as path from 'path';
 import { FileManager } from '../manager/file.manager.js';
 
 export interface SchemaComparison {
@@ -18,43 +17,6 @@ export class SchemaComparisonService {
   ] as const;
 
   /**
-   * normalize sql dump
-   */
-  private async normalizeDump(filePath: string): Promise<string> {
-    let content = FileManager.readFile(filePath);
-
-    // remove comments and timestamps
-    //content = content.replace(/^--.*$/gm, '');
-
-    // remove definer clauses
-    content = content.replace(/DEFINER=`[^`]+`@`[^`]+`/g, '');
-
-    // remove auto increment values
-    content = content.replace(/AUTO_INCREMENT=\d+/g, '');
-
-    // remove engine
-    content = content.replace(/ENGINE=\w+(\s+DEFAULT CHARSET=[\w\d]+)?/gi, '');
-
-    // collate
-    content = content.replace(/\s+COLLATE=[\w\d_]+/gi, '');
-    
-    /*content = content.replace(
-    /CREATE TABLE `migration_history`[\s\S]*?;\n?/gi, '');*/
-
-    // trim whitespace
-    content = content.split('\n').map(line => line.trim()).join('\n');
-
-    // sort create statements
-    const statements = content
-      .split(/;\s*\n/)      
-      .map(stmt => stmt.trim())
-      .filter(Boolean)
-      .sort(); 
-
-    return statements.join(';\n') + ';';
-  }
-
-  /**
    * 
    */
   public async compareSchemasBash(
@@ -65,21 +27,7 @@ export class SchemaComparisonService {
     const sourceFile = `${snapshotPath}/${FileManager.readDirectory(snapshotPath)[0]}`
     const tempFile = `${tempDbDumpPath}/${FileManager.readDirectory(tempDbDumpPath)[0]}`
 
-    let normalizedSourcePath: string | null = null;
-    let normalizedTempPath: string | null = null;
-
-    // normalize dumps for comparison
-    const normalizedSource = await this.normalizeDump(sourceFile);
-    const normalizedTemp = await this.normalizeDump(tempFile);
-    
     try {
-      normalizedSourcePath = path.join(snapshotPath, SNAPSHOT_NORMALIZED);
-      normalizedTempPath = path.join(tempDbDumpPath, TEMP_NORMALIZED);
-      
-      // write normalized file
-      FileManager.writeFile(normalizedSourcePath, normalizedSource)
-      FileManager.writeFile(normalizedTempPath, normalizedTemp)
-
       // diff command
       const excludePatterns = [
         ...SchemaComparisonService.EXCLUDED_TABLES,
@@ -93,34 +41,24 @@ export class SchemaComparisonService {
         '--ignore-space-change',
         '--strip-trailing-cr',
         ...excludePatterns,
-        normalizedSourcePath,
-        normalizedTempPath
+        sourceFile,
+        tempFile
       ].join(' ');
 
       try {
         await execAsync(diffCommand);
-        // Exit code 0 → files are identical
+        // exit code 0 = identical schemas
         return { isIdentical: true, diff: '' };
       } catch (err: any) {
         if (err.code === 1) {
-            // Exit code 1 → files differ
+            // exit code 1 = schemas differ
             return { isIdentical: false, diff: err.stdout || '' };
         }
-        // Other exit codes → something went wrong
         throw err;
       }
     } catch (error: any) {
       throw new Error()
-    } finally {
-      if (normalizedSourcePath !== undefined && normalizedSourcePath !== null) {
-        FileManager.removeFile(normalizedSourcePath)
-      }
-
-      if (normalizedTempPath !== undefined && normalizedTempPath !== null) {
-        FileManager.removeFile(normalizedTempPath)
-      }
-    }
-
+    } 
   }
 
   public formatResult(isIdentical: boolean): string {

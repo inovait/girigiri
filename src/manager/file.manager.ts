@@ -58,7 +58,7 @@ export const FileManager = {
     }
 
     try {
-      return fs.readFileSync(file_path, "utf-8");
+      return fs.readFileSync(file_path, {encoding: "utf-8"});
     } catch (error: any) {
       logger.error(ERROR_MESSAGES.FILE.READ, error);
       throw new Error(`Error reading file ${file_path}: ${error}`);

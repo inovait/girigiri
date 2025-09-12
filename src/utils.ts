@@ -79,7 +79,7 @@ export function runMySqlCommand(
 
 const _execAsync = promisify(exec);
 export async function execAsync(command: string): Promise<{ stdout: string; stderr: string }> {
-  const { stdout, stderr } = await _execAsync(command);
+  const { stdout, stderr } = await _execAsync(command, { shell: '/bin/bash' });
   return { stdout, stderr };
 }
 

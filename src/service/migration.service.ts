@@ -265,6 +265,7 @@ export class MigrationService {
             `-u${databaseConfig.user}`,
             `-h${databaseConfig.host}`,
             `-P${databaseConfig.port}`,
+            '--comments',
             databaseConfig.database
         ];
 

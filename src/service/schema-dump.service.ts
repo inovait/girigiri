@@ -6,10 +6,11 @@ import { DatabaseManager } from "../manager/database.manager.js";
 import { FileManager } from "../manager/file.manager.js";
 import { MIGRATION_HISTORY_TABLE, SELECT_EVENTS, SELECT_FUNCTIONS, SELECT_PROCEDURES, SELECT_TRIGGERS, SELECT_VIEWS } from "../constants/constants.js";
 import { ERROR_MESSAGES } from "../constants/error-messages.js";
-import type { Connection } from "mysql2/promise";
+import type { Connection, RowDataPacket } from "mysql2/promise";
 import { SCHEMA_OBJECT_TYPE } from "../enum/schema-object-type.enum.js";
 import type { SchemaObjectType } from "../enum/schema-object-type.enum.js";
 import path from "path";
+import { create } from "domain";
 
 
 export class SchemaDumpService {
@@ -29,7 +30,6 @@ export class SchemaDumpService {
       `-P${databaseConfig.port}`,
       "--no-data",
       "--skip-comments",
-      "--skip-extended-insert",
       "--single-transaction",
       "--routines",
       "--triggers",
@@ -62,7 +62,9 @@ export class SchemaDumpService {
   async dumpSchema(databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
     // first check if directory for outputing the migrations exists
     // create if it doesnt
+    let connection: Connection = await this.databaseManager.connect(databaseConfig)
     let outputDir: string = fileConfig.migrationsDir
+
     if (!FileManager.checkDirectory(outputDir)) {
       FileManager.makeDirectory(outputDir)
       logger.info(`Created directory: ${outputDir}`);
@@ -71,26 +73,27 @@ export class SchemaDumpService {
     }
 
     // retrieve the schema tables
-    let tables = await this.getTables(databaseConfig)
+    let tables = await this.getTables(connection, databaseConfig.database!)
 
     // retrieve schnema objects
     const schemaObjects = [
-      { type: SCHEMA_OBJECT_TYPE.PROCEDURE, data: await this.getDatabaseObjects(databaseConfig, SCHEMA_OBJECT_TYPE.PROCEDURE) },
-      { type: SCHEMA_OBJECT_TYPE.VIEW,      data: await this.getDatabaseObjects(databaseConfig, SCHEMA_OBJECT_TYPE.VIEW) },
-      { type: SCHEMA_OBJECT_TYPE.EVENT,     data: await this.getDatabaseObjects(databaseConfig, SCHEMA_OBJECT_TYPE.EVENT) },
-      { type: SCHEMA_OBJECT_TYPE.TRIGGER,   data: await this.getDatabaseObjects(databaseConfig, SCHEMA_OBJECT_TYPE.TRIGGER) },
-      { type: SCHEMA_OBJECT_TYPE.FUNCTION,   data: await this.getDatabaseObjects(databaseConfig, SCHEMA_OBJECT_TYPE.FUNCTION) },
+      { type: SCHEMA_OBJECT_TYPE.PROCEDURE, data: await this.getDatabaseObjects(connection, databaseConfig.database!, SCHEMA_OBJECT_TYPE.PROCEDURE) },
+      { type: SCHEMA_OBJECT_TYPE.VIEW,      data: await this.getDatabaseObjects(connection, databaseConfig.database!, SCHEMA_OBJECT_TYPE.VIEW) },
+      { type: SCHEMA_OBJECT_TYPE.EVENT,     data: await this.getDatabaseObjects(connection, databaseConfig.database!, SCHEMA_OBJECT_TYPE.EVENT) },
+      { type: SCHEMA_OBJECT_TYPE.TRIGGER,   data: await this.getDatabaseObjects(connection, databaseConfig.database!, SCHEMA_OBJECT_TYPE.TRIGGER) },
+      { type: SCHEMA_OBJECT_TYPE.FUNCTION,   data: await this.getDatabaseObjects(connection, databaseConfig.database!, SCHEMA_OBJECT_TYPE.FUNCTION) },
     ];
 
     // dump the database objects
     for (const { type, data } of schemaObjects) {
       for (const objectName of data) {
         try {
-          await this.dumpDbObject(objectName, type, databaseConfig, fileConfig);
+          await this.dumpDbObject(connection, objectName, type, databaseConfig, fileConfig);
         } catch (err: any ) {
+          connection.end()
           logger.error(`Failed to dump ${type} "${objectName}"`, err);
           throw new Error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(type, err))
-        }
+        } 
       }
     }
 
@@ -101,74 +104,87 @@ export class SchemaDumpService {
       } catch (err: any) {
         logger.error(ERROR_MESSAGES.SCHEMA_DUMP.STOP_DUE_TO_ERROR, err);
         throw err;
+      } finally {
+        connection.end()
       }
     }
   }
 
-  private async dumpDbObject(objectName: string, schemaObjectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
+  private async dumpDbObject(connection: Connection, objectName: string, schemaObjectType: SchemaObjectType, databaseConfig: DatabaseConfig, fileConfig: FileConfig) {
+    // first create the directory
     const outputPath = path.join(`${fileConfig.schemaOutputDir}/${schemaObjectType}`, `${objectName}.sql`);
     FileManager.makeDirectory(`${fileConfig.schemaOutputDir}/${schemaObjectType}`)
-    const dumpCommand = [
-      'mysql',
-      `-u${databaseConfig.user}`,
-      `-h${databaseConfig.host}`,
-      `-P${databaseConfig.port}`,
-      '-e',
-      `"SHOW CREATE ${schemaObjectType} \\\`${databaseConfig.database}\\\`.\\\`${objectName}\\\`"`
-    ].join(' ');
 
+    // create the query 
+    const query = `SHOW CREATE ${schemaObjectType} \`${databaseConfig.database}\`.\`${objectName}\``;
+    const [rows] = await connection.execute<RowDataPacket[]>(query);
 
-    const fullCommand = `${dumpCommand} > "${outputPath}"`;
-    await runMySqlCommand(fullCommand, databaseConfig.password, false);
+    let createSql: string;
+    switch (schemaObjectType) {
+      case SCHEMA_OBJECT_TYPE.EVENT:
+        createSql = rows[0]['Create Event'];
+        break;
+      case SCHEMA_OBJECT_TYPE.TRIGGER:
+        createSql = rows[0]['SQL Original Statement'] || rows[0]['Create Trigger'];
+        break;
+      case SCHEMA_OBJECT_TYPE.VIEW:
+        createSql = rows[0]['Create View'];
+        break;
+      case SCHEMA_OBJECT_TYPE.PROCEDURE:
+        createSql = rows[0]['Create Procedure'];
+        break;
+      case SCHEMA_OBJECT_TYPE.FUNCTION:
+        createSql = rows[0]['Create Function'];
+        break;
+      default:
+        throw new Error(`Unsupported schema object type: ${schemaObjectType}`);
+    }
+
+    logger.info(`Dumping ${schemaObjectType}: ${objectName} `)
+    FileManager.writeFile(outputPath, createSql)
     return outputPath;
   }
 
-  private async getDatabaseObjects(databaseConfig: DatabaseConfig, routine: SchemaObjectType) {
-    let mainConnection!: Connection;
+  private async getDatabaseObjects(connection: Connection, dbName: string, routine: SchemaObjectType) {    
     try {
-      mainConnection = await this.databaseManager.connect(databaseConfig)
       let sql: string | null = null;
       switch (routine) {
-        case SCHEMA_OBJECT_TYPE.PROCEDURE: sql = SELECT_PROCEDURES(databaseConfig.database!)
+        case SCHEMA_OBJECT_TYPE.PROCEDURE: sql = SELECT_PROCEDURES(dbName)
           break;
-        case SCHEMA_OBJECT_TYPE.TRIGGER: sql = SELECT_TRIGGERS(databaseConfig.database!)
+        case SCHEMA_OBJECT_TYPE.TRIGGER: sql = SELECT_TRIGGERS(dbName)
           break;
-        case SCHEMA_OBJECT_TYPE.EVENT: sql = SELECT_EVENTS(databaseConfig.database!)
+        case SCHEMA_OBJECT_TYPE.EVENT: sql = SELECT_EVENTS(dbName)
           break;
-        case SCHEMA_OBJECT_TYPE.VIEW: sql = SELECT_VIEWS(databaseConfig.database!)
+        case SCHEMA_OBJECT_TYPE.VIEW: sql = SELECT_VIEWS(dbName)
           break;
-        case SCHEMA_OBJECT_TYPE.FUNCTION: sql = SELECT_FUNCTIONS(databaseConfig.database!)
+        case SCHEMA_OBJECT_TYPE.FUNCTION: sql = SELECT_FUNCTIONS(dbName)
           break;
         default: throw new Error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(routine))
       }
 
-      const [dbOjects]: any[] = await mainConnection.query(sql)
+      const [dbOjects]: any[] = await connection.query(sql)
       return dbOjects.map((row: any) => { return row.name })
     } catch (error: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_SCHEMA_OBJECTS(routine), error);
+      connection?.end();
       throw error;
-    } finally {
-      mainConnection?.end();
-    }
+    } 
   }
 
   /**
    * Retrieves database tables
    */
-  private async getTables(databaseConfig: DatabaseConfig) {
-    let mainConnection!: Connection;
+  private async getTables(connection: Connection, dbName: string) {
+  
     try {
-      mainConnection = await this.databaseManager.connect(databaseConfig)
-      const [tables]: any[] = await mainConnection.query(
-        `SELECT table_name as TABLE_NAME FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [databaseConfig.database]);
-
+      const [tables]: any[] = await connection.query(
+        `SELECT table_name as TABLE_NAME FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`, [dbName]);
       return tables.map((row: any) => { return row.TABLE_NAME })
     } catch (error: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.FETCH_TABLES, error);
+      connection?.end();
       throw error;
-    } finally {
-      mainConnection?.end();
-    }
+    } 
   }
 
   /**
@@ -190,12 +206,12 @@ export class SchemaDumpService {
     }
 
     let mysqldumpCmd = `mysqldump ${args.join(' ')}`;
-    const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/${table}.sql`;
+    const dumpCommand = `${mysqldumpCmd} > ${fileConfig.schemaOutputDir}/tables/${table}.sql`;
 
     try {
       logger.info(`Dumping table: ${table}`)
       await runMySqlCommand(dumpCommand, config.password)
-      return `${fileConfig.schemaOutputDir}/${table}.sql`
+      return `${fileConfig.schemaOutputDir}/tables/${table}.sql`
     } catch (err: any) {
       logger.error(ERROR_MESSAGES.SCHEMA_DUMP.TABLE(table), err);
       throw err
