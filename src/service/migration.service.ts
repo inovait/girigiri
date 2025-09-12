@@ -329,7 +329,7 @@ export class MigrationService {
      */
     private async migrateTempTable(connection: Connection, fileConfig: FileConfig, migHistoryExists: boolean) {
         if(migHistoryExists) {
-            this.migrate(connection, {} as DatabaseConfig, fileConfig);
+            await this.migrate(connection, {} as DatabaseConfig, fileConfig);
             return;
         }
 
