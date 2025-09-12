@@ -93,7 +93,7 @@ export class MigrationService {
             // connects to the temp database
             tempConnection = await this.databaseManager.connect(tempDatabaseConfig);
             // triggers the migration on the temp database
-            await this.migrate(tempConnection, tempDatabaseConfig, tempSchemaConfig);
+            await this.migrateTempTable(tempConnection, tempSchemaConfig, migHistoryExists)
             // dumps the tmp database schema
             logger.info(`Dumping temporary database schema to ${tempSchemaDir}`);
             await this.dumpSchema(tempDatabaseConfig, tempSchemaConfig, "temp_db")
@@ -148,11 +148,8 @@ export class MigrationService {
         logger.info('Restoring main schema to temporary database...');
         await this.executeSqlCommand(this.config.tempDatabaseConfig, schemaPath);
 
-        logger.info("Initializing migration history table");
-        const initMigrationsPath = path.join(this.__dirname, '..', '..', 'database/init_migrations.sql');
-        await this.executeSqlCommand(this.config.tempDatabaseConfig, initMigrationsPath);
-
         if (migrationHistoryPath) {
+            logger.info('Restoring migration history data if applicable')
             await this.restoreMigrationHistoryData(this.config.tempDatabaseConfig, migrationHistoryPath);
         }
 
@@ -328,6 +325,22 @@ export class MigrationService {
     }
 
     /**
+     * Migrate temporary table. Check if mig history exists, if not apply without
+     */
+    private async migrateTempTable(connection: Connection, fileConfig: FileConfig, migHistoryExists: boolean) {
+        if(migHistoryExists) {
+            this.migrate(connection, {} as DatabaseConfig, fileConfig);
+            return;
+        }
+
+        const migrationFiles = this.getMigrationFiles();
+        migrationFiles.forEach(async migrationFile => {
+            const filePath = path.join(fileConfig.migrationsDir, migrationFile);
+            await this.applyMigrationWithoutHistory(connection, filePath, migrationFile)    
+        });        
+    }
+
+    /**
      * Runs migrations on the specified database
      */
     async migrate(
@@ -421,6 +434,33 @@ export class MigrationService {
             throw error;
         }
     }
+
+
+    private async applyMigrationWithoutHistory(connection: Connection, filePath: string, fileName: string) {
+        const sqlRaw = FileManager.readFile(filePath);
+        const sql = this.databaseManager.preprocessSqlFile(sqlRaw)
+        try {
+            logger.info(`Applying migration: ${fileName}`);
+            await connection.beginTransaction();
+            await connection.query(sql);
+            await connection.commit();
+            logger.info(`Applied migration successfully: ${fileName}`);
+
+        } catch (error: any) {
+            logger.error(ERROR_MESSAGES.MIGRATION.FAILED_MIGRATION(fileName));
+
+            try {
+                await connection.rollback();
+            } catch (rollbackError: any) {
+                logger.error(ERROR_MESSAGES.MIGRATION.ROLLBACK, rollbackError);
+                throw rollbackError;
+            }
+
+            logger.error(error.stack);
+            throw error;
+        }
+    }
+
 
     /**
      * Applies a single migration file
